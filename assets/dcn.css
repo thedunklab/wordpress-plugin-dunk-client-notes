@@ -12,7 +12,7 @@
   border: 2px solid var(--ink); border-radius: 999px; background: var(--accent); color: var(--ink); font-weight: 700; box-shadow: 0 8px 24px rgba(10, 10, 10, .3); pointer-events: auto; }
 .fab:hover { background: var(--accent-dark); }
 .fab svg { width: 20px; height: 20px; }
-.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--ink); color: var(--accent); font-size: 12px; line-height: 20px; text-align: center; }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 2px 6px 0; border-radius: 99px; background: var(--ink); color: var(--accent); font-size: 12px; font-weight: 700; line-height: 1; }
 
 /* pannello */
 .panel { position: fixed; top: 12px; right: 12px; bottom: 80px; z-index: 3; display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 24px);
@@ -44,7 +44,7 @@
 /* elenco */
 .item { display: flex; gap: 10px; width: 100%; margin: 4px 0; padding: 10px; border: 1px solid transparent; border-radius: 12px; background: transparent; text-align: left; }
 .item:hover { border-color: var(--line); background: var(--soft); }
-.num { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--accent); color: var(--ink); font-size: 12px; font-weight: 700; }
+.num { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--accent); color: var(--ink); font-size: 12px; font-weight: 700; line-height: 1; padding-top: 2px; }
 .num.progress { background: var(--ink); color: var(--accent); }
 .num.resolved { background: var(--done); color: var(--ink); }
 .item-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
@@ -87,7 +87,7 @@
 /* puntine sulla pagina */
 .pin { position: fixed; left: 0; top: 0; z-index: 2; display: grid; place-items: center; width: 30px; height: 30px; margin: -30px 0 0 0; border: 2px solid var(--ink); border-radius: 50% 50% 50% 0; transform-origin: 0 100%;
   background: var(--accent); color: var(--ink); font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(0, 0, 0, .35); pointer-events: auto; }
-.pin span { transform: rotate(45deg); }
+.pin span { transform: rotate(45deg); line-height: 1; padding-top: 2px; }
 .pin { rotate: -45deg; }
 .pin.progress { background: var(--ink); color: var(--accent); border-color: var(--accent); }
 .pin.resolved { background: var(--done); }
