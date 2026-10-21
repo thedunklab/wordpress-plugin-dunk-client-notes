@@ -183,10 +183,12 @@
         }
         list.forEach((n) => body.append(h('button', { class: 'item', type: 'button', onclick: () => (n.path === path ? openNote(n.id) : (location.href = n.url ? `${n.url.split('#')[0]}#dcn-${n.id}` : `${n.path}#dcn-${n.id}`)) },
             numBadge(n),
-            h('span', {},
+            h('span', { class: 'item-body' },
                 h('span', { class: 'txt' }, n.text),
-                h('span', { class: 'meta' }, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : '', state.tab === 'all' ? ` · ${n.path}` : ''),
-                n.status !== 'open' ? statusBadge(n.status) : null
+                h('span', { class: 'item-meta' },
+                    h('span', {}, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : ''),
+                    state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
+                    n.status !== 'open' ? statusBadge(n.status) : null)
             )
         )))
     }

@@ -39,6 +39,9 @@
 .num { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--accent); color: var(--ink); font-size: 12px; font-weight: 700; }
 .num.progress { background: var(--ink); color: var(--accent); }
 .num.resolved { background: var(--done); color: var(--ink); }
+.item-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.path { padding: 1px 6px; border-radius: 6px; background: var(--soft); color: var(--ink); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .item .txt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; }
 .meta { margin-top: 2px; color: var(--muted); font-size: 12px; }
 .st { display: inline-block; padding: 2px 9px; white-space: nowrap; line-height: 1.3; border: 1px solid var(--ink); border-radius: 99px; background: var(--accent); color: var(--ink); font-size: 11px; font-weight: 600; }
