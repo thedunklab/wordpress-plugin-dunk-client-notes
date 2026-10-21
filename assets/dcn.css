@@ -35,9 +35,11 @@
 .empty { padding: 28px 14px; color: var(--muted); text-align: center; }
 
 /* firma */
-.by-dunk { display: block; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--soft); color: var(--muted); font-size: 12px; text-align: center; text-decoration: none; }
-.by-dunk strong { padding: 0 4px; border-radius: 3px; background: var(--accent); color: var(--ink); letter-spacing: .04em; }
-.by-dunk:hover strong { background: var(--ink); color: var(--accent); }
+.by-dunk { padding: 8px 14px; border-top: 1px solid var(--line); background: var(--soft); color: var(--muted); font-size: 12px; text-align: center; text-decoration: none; }
+.by-dunk { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.by-dunk .logo { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 5px; background: var(--accent); color: var(--ink); }
+.by-dunk .logo svg { display: block; width: auto; height: 13px; }
+.by-dunk:hover .logo { background: var(--ink); color: var(--accent); }
 
 /* elenco */
 .item { display: flex; gap: 10px; width: 100%; margin: 4px 0; padding: 10px; border: 1px solid transparent; border-radius: 12px; background: transparent; text-align: left; }

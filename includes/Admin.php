@@ -35,7 +35,7 @@ class Admin
     /** Firma in fondo alle schermate del plugin. */
     private static function signature(): string
     {
-        return '<p style="margin-top:28px;color:#6b6b66;font-size:12px">DUNK Client Notes · by <a href="https://thedunk.it" target="_blank" rel="noopener" style="background:#fee000;color:#0a0a0a;padding:0 4px;border-radius:3px;font-weight:700;text-decoration:none;letter-spacing:.04em">DUNK</a></p>';
+        return '<p style="display:flex;align-items:center;gap:8px;margin-top:28px;color:#6b6b66;font-size:12px">DUNK Client Notes · by <a href="https://thedunk.it" target="_blank" rel="noopener" style="display:inline-flex;background:#fee000;padding:4px 9px;border-radius:5px"><img src="' . esc_url(DCN_URL . 'assets/dunk-logo.svg') . '" alt="DUNK" style="display:block;height:13px;width:auto"></a></p>';
     }
 
     public static function menu(): void
