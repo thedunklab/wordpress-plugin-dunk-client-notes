@@ -128,7 +128,7 @@
     const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z"/></svg>'
     const renderFab = () => {
         const open = state.notes.filter((n) => n.status !== 'resolved').length
-        fab.replaceChildren(document.createRange().createContextualFragment(ICON), 'Note', open ? h('span', { class: 'badge' }, open) : null)
+        fab.replaceChildren(...[document.createRange().createContextualFragment(ICON), 'Note', open ? h('span', { class: 'badge' }, open) : null].filter(Boolean))
     }
 
     const renderPins = () => {
