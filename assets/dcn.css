@@ -1,7 +1,7 @@
 /* DUNK Client Notes: stile dell'interfaccia (vive in uno Shadow DOM, il CSS del sito non lo tocca) */
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
-.dcn { --ink: #0a0a0a; --muted: #6b6b66; --line: #e8e8e4; --accent: #fee000; --accent-dark: #f0d400; --bg: #fff; --soft: #f6f6f1; --done: #d9d9d4;
+.dcn { --ink: #0a0a0a; --muted: #6b6b66; --line: #e8e8e4; --accent: #fee000; --accent-dark: #f0d400; --bg: #fff; --soft: #f6f6f1; --done: #4ade80;
   font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--ink); pointer-events: none; }
 .dcn button { font: inherit; cursor: pointer; }
 .dcn [hidden] { display: none !important; }
@@ -82,7 +82,7 @@
 .pin span { transform: rotate(45deg); }
 .pin { rotate: -45deg; }
 .pin.progress { background: var(--ink); color: var(--accent); border-color: var(--accent); }
-.pin.resolved { background: var(--done); opacity: .8; }
+.pin.resolved { background: var(--done); }
 .pin.active { outline: 3px solid var(--ink); outline-offset: 2px; }
 .pin.approx { border-style: dashed; }
 

@@ -155,7 +155,7 @@ class Admin
     private static function badge(string $status): string
     {
         // giallo e nero DUNK: distinti dai colori del sito
-        [$bg, $fg] = ['open' => ['#fee000', '#0a0a0a'], 'progress' => ['#0a0a0a', '#fee000'], 'resolved' => ['#d9d9d4', '#0a0a0a']][$status] ?? ['#d9d9d4', '#0a0a0a'];
+        [$bg, $fg] = ['open' => ['#fee000', '#0a0a0a'], 'progress' => ['#0a0a0a', '#fee000'], 'resolved' => ['#4ade80', '#0a0a0a']][$status] ?? ['#d9d9d4', '#0a0a0a'];
 
         return '<span style="display:inline-block;padding:2px 10px;border:1px solid #0a0a0a;border-radius:99px;background:' . esc_attr($bg) . ';color:' . esc_attr($fg) . ';font-size:12px;font-weight:600">' . esc_html(self::STATUS_LABEL[$status] ?? $status) . '</span>';
     }
