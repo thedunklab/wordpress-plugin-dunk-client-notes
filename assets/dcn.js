@@ -207,7 +207,10 @@
         const n = state.notes.find((x) => x.id === state.current) || (state.all || []).find((x) => x.id === state.current)
         if (!n) { body.append(h('div', { class: 'empty' }, 'Nota non trovata.')); return }
         body.append(h('div', { class: 'note-card' },
-            h('div', { class: 'by' }, numBadge(n), h('strong', {}, n.author), n.source === 'team' ? h('span', { class: 'meta' }, '(team)') : null, h('span', { class: 'meta' }, n.date), statusBadge(n.status)),
+            h('div', { class: 'by' }, numBadge(n),
+                h('div', { class: 'by-info' },
+                    h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null),
+                    h('div', { class: 'by-meta' }, n.date, statusBadge(n.status)))),
             h('p', {}, n.text),
             n.shot ? h('a', { class: 'shot', href: n.shot, target: '_blank', rel: 'noopener' }, h('img', { src: n.shot, alt: 'Screenshot della pagina al momento della nota', loading: 'lazy' })) : null
         ))
@@ -216,7 +219,7 @@
                 h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: async () => {
                     try { await api(`/notes/${n.id}/status`, { method: 'POST', body: { status: k } }); await load(); } catch (e) { toast(e.message) }
                 } }, label))
-            ), h('p', { class: 'meta', style: 'margin:0 4px' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank' }, 'Apri in bacheca')))
+            ), h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
         }
         n.replies.forEach((r) => body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', h('span', { class: 'meta' }, ' · ' + r.date), h('p', {}, r.text))))
         const name = h('input', { type: 'text', placeholder: 'Il tuo nome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, 'aria-label': 'Il tuo nome' })
