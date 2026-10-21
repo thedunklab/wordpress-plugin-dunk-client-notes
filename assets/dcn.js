@@ -115,8 +115,8 @@
     /* ---------- caricamento ---------- */
     const load = async () => {
         try {
-            state.notes = await api('/notes?path=' + encodeURIComponent(path))
-            if (state.all) state.all = await api('/notes')
+            state.all = await api('/notes')
+            state.notes = state.all.filter((n) => n.path === path)
         } catch (e) { toast(e.message) }
         render()
     }
@@ -131,7 +131,10 @@
 
     const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z"/></svg>'
     const renderFab = () => {
-        const open = state.notes.filter((n) => n.status !== 'resolved').length
+        // il numero è il totale delle note aperte in tutto il sito (nel tooltip anche quelle di questa pagina)
+        const open = (state.all || state.notes).filter((n) => n.status !== 'resolved').length
+        const here = state.notes.filter((n) => n.status !== 'resolved').length
+        fab.title = `${open} not${open === 1 ? 'a aperta' : 'e aperte'} nel sito, ${here} in questa pagina`
         fab.replaceChildren(...[document.createRange().createContextualFragment(ICON), 'Note', open ? h('span', { class: 'badge' }, open) : null].filter(Boolean))
     }
 
@@ -176,7 +179,7 @@
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Risolte'),
         h('div', { class: 'tabs', role: 'tablist' },
             h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page'), onclick: () => { state.tab = 'page'; renderPanel() } }, 'Questa pagina'),
-            h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all'), onclick: async () => { state.tab = 'all'; if (!state.all) { try { state.all = await api('/notes') } catch (e) { toast(e.message) } } renderPanel() } }, 'Tutte')
+            h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all'), onclick: () => { state.tab = 'all'; renderPanel() } }, 'Tutte')
         )
     )
 
