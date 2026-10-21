@@ -21,14 +21,17 @@
 .head h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 700; }
 .icon { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 18px; }
 .icon:hover { background: var(--ink); color: var(--accent); }
-.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.tools { display: grid; gap: 8px; padding: 10px 14px 8px; border-bottom: 1px solid var(--line); }
+.tools-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tools-row.sub { min-height: 22px; }
+.count { color: var(--muted); font-size: 12px; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; line-height: 1; white-space: nowrap; text-align: center; border: 1px solid var(--ink); border-radius: 99px; background: #fff; color: var(--ink); font-weight: 600; }
 .btn:hover { background: var(--soft); }
 .btn.primary { background: var(--accent); color: var(--ink); }
 .btn.primary:hover { background: var(--accent-dark); }
 .btn:disabled { opacity: .5; cursor: default; }
-.tabs { display: flex; gap: 4px; margin-left: auto; }
-.tab { height: 30px; padding: 0 10px; border: 0; border-radius: 99px; background: transparent; color: var(--muted); font-weight: 600; }
+.tabs { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--ink); border-radius: 99px; background: #fff; }
+.tab { height: 26px; padding: 0 12px; border: 0; border-radius: 99px; background: transparent; color: var(--ink); font-weight: 600; }
 .tab[aria-selected='true'] { background: var(--accent); color: var(--ink); }
 .dcn input[type='checkbox'] { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 20px; height: 20px; margin: 0; padding: 0; border: 2px solid var(--ink); border-radius: 6px; background: #fff; cursor: pointer; transition: background .15s; }
 .dcn input[type='checkbox']:hover { background: #fff8b3; }
