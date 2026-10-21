@@ -29,7 +29,7 @@ class Admin
         if (!$screen || strpos((string) $screen->id, 'dcn-') === false) {
             return;
         }
-        echo '<style>' . Plugin::font_face() . ".dcn-wrap, .dcn-wrap input, .dcn-wrap select, .dcn-wrap textarea, .dcn-wrap button, .dcn-wrap .button { font-family: 'DM Sans', -apple-system, 'Segoe UI', sans-serif; }</style>\n";
+        echo '<style>' . Plugin::font_face() . ".dcn-wrap, .dcn-wrap input, .dcn-wrap select, .dcn-wrap textarea, .dcn-wrap button, .dcn-wrap .button { font-family: 'DM Sans', -apple-system, 'Segoe UI', sans-serif; } .dcn-wrap .wp-list-table th, .dcn-wrap .wp-list-table td { vertical-align: middle; }</style>\n";
     }
 
     /** Firma in fondo alle schermate del plugin. */
@@ -176,7 +176,7 @@ class Admin
         // giallo e nero DUNK: distinti dai colori del sito
         [$bg, $fg] = ['open' => ['#fee000', '#0a0a0a'], 'progress' => ['#0a0a0a', '#fee000'], 'resolved' => ['#4ade80', '#0a0a0a']][$status] ?? ['#d9d9d4', '#0a0a0a'];
 
-        return '<span style="display:inline-block;padding:2px 10px;border:1px solid #0a0a0a;border-radius:99px;background:' . esc_attr($bg) . ';color:' . esc_attr($fg) . ';font-size:12px;font-weight:600">' . esc_html(self::STATUS_LABEL[$status] ?? $status) . '</span>';
+        return '<span style="display:inline-flex;align-items:center;padding:4px 11px 3px;border:1px solid #0a0a0a;border-radius:99px;background:' . esc_attr($bg) . ';color:' . esc_attr($fg) . ';font-size:12px;font-weight:600;line-height:1">' . esc_html(self::STATUS_LABEL[$status] ?? $status) . '</span>';
     }
 
     private static function detail(int $id): void
