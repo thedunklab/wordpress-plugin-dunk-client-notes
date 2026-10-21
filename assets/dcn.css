@@ -2,7 +2,8 @@
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
 .dcn { --ink: #0a0a0a; --muted: #6b6b66; --line: #e8e8e4; --accent: #fee000; --accent-dark: #f0d400; --bg: #fff; --soft: #f6f6f1; --done: #4ade80;
-  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--ink); pointer-events: none; }
+  font: 14px/1.45 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--ink); pointer-events: none; }
+.dcn button, .dcn input, .dcn textarea { font-family: inherit; }
 .dcn button { font: inherit; cursor: pointer; }
 .dcn [hidden] { display: none !important; }
 
@@ -16,10 +17,10 @@
 /* pannello */
 .panel { position: fixed; top: 12px; right: 12px; bottom: 80px; z-index: 3; display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 24px);
   border: 1px solid var(--line); border-radius: 16px; background: var(--bg); box-shadow: 0 20px 60px rgba(10, 10, 10, .28); overflow: hidden; pointer-events: auto; }
-.head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 2px solid var(--ink); background: var(--accent); color: var(--ink); }
 .head h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 700; }
-.icon { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 18px; }
-.icon:hover { background: var(--soft); color: var(--ink); }
+.icon { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 18px; }
+.icon:hover { background: var(--ink); color: var(--accent); }
 .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 14px; line-height: 1; white-space: nowrap; text-align: center; border: 1px solid var(--ink); border-radius: 99px; background: #fff; color: var(--ink); font-weight: 600; }
 .btn:hover { background: var(--soft); }
@@ -32,6 +33,11 @@
 .check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
 .body { flex: 1; overflow: auto; padding: 8px 10px 14px; }
 .empty { padding: 28px 14px; color: var(--muted); text-align: center; }
+
+/* firma */
+.by-dunk { display: block; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--soft); color: var(--muted); font-size: 12px; text-align: center; text-decoration: none; }
+.by-dunk strong { padding: 0 4px; border-radius: 3px; background: var(--accent); color: var(--ink); letter-spacing: .04em; }
+.by-dunk:hover strong { background: var(--ink); color: var(--accent); }
 
 /* elenco */
 .item { display: flex; gap: 10px; width: 100%; margin: 4px 0; padding: 10px; border: 1px solid transparent; border-radius: 12px; background: transparent; text-align: left; }

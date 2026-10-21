@@ -57,6 +57,12 @@ class Plugin
         return substr(hash_hmac('sha256', 'dcn|' . home_url(), wp_salt('auth')), 0, 32);
     }
 
+    /** @font-face di DM Sans (file nel plugin, nessuna richiesta a servizi esterni). */
+    public static function font_face(): string
+    {
+        return "@font-face{font-family:'DM Sans';font-style:normal;font-weight:100 1000;font-display:swap;src:url('" . esc_url(DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2') . "') format('woff2');}";
+    }
+
     public static function label(): string
     {
         return (string) (get_option('dcn_label') ?: get_bloginfo('name'));
@@ -72,7 +78,7 @@ class Plugin
         $team = current_user_can('edit_posts');
 
         wp_enqueue_script('dcn-html2canvas', DCN_URL . 'assets/vendor/html2canvas-pro.min.js', [], '2.5.0', true);
-        wp_enqueue_script('dcn', DCN_URL . 'assets/dcn.js', ['dcn-html2canvas'], DCN_VERSION, true);
+        wp_enqueue_script('dcn', DCN_URL . 'assets/dcn.js', ['dcn-html2canvas'], DCN_VERSION . '.' . filemtime(DCN_DIR . 'assets/dcn.js'), true);
 
         $css = (string) file_get_contents(DCN_DIR . 'assets/dcn.css');
         wp_add_inline_script('dcn', 'window.dcnConfig=' . wp_json_encode([
@@ -84,6 +90,7 @@ class Plugin
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
             'css'    => $css,
+            'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');
     }
 

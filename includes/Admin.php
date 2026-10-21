@@ -19,6 +19,23 @@ class Admin
         add_action('admin_post_dcn_status', [self::class, 'handle_status']);
         add_action('admin_post_dcn_delete', [self::class, 'handle_delete']);
         add_action('admin_notices', [self::class, 'notice']);
+        add_action('admin_head', [self::class, 'font']);
+    }
+
+    /** DM Sans nelle schermate del plugin (elenco, scheda, impostazioni). */
+    public static function font(): void
+    {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if (!$screen || strpos((string) $screen->id, 'dcn-') === false) {
+            return;
+        }
+        echo '<style>' . Plugin::font_face() . ".dcn-wrap, .dcn-wrap input, .dcn-wrap select, .dcn-wrap textarea, .dcn-wrap button, .dcn-wrap .button { font-family: 'DM Sans', -apple-system, 'Segoe UI', sans-serif; }</style>\n";
+    }
+
+    /** Firma in fondo alle schermate del plugin. */
+    private static function signature(): string
+    {
+        return '<p style="margin-top:28px;color:#6b6b66;font-size:12px">DUNK Client Notes · by <a href="https://thedunk.it" target="_blank" rel="noopener" style="background:#fee000;color:#0a0a0a;padding:0 4px;border-radius:3px;font-weight:700;text-decoration:none;letter-spacing:.04em">DUNK</a></p>';
     }
 
     public static function menu(): void
@@ -47,7 +64,7 @@ class Admin
     {
         $locked = defined('DUNK_NOTES_ENABLED');
         ?>
-        <div class="wrap">
+        <div class="wrap dcn-wrap">
             <h1>Note cliente · Impostazioni</h1>
             <form method="post" action="options.php">
                 <?php settings_fields('dcn'); ?>
@@ -74,6 +91,7 @@ class Admin
                 </table>
                 <?php submit_button(); ?>
             </form>
+            <?php echo self::signature(); // statica ?>
         </div>
         <?php
     }
@@ -108,7 +126,7 @@ class Admin
         $paths = $wpdb->get_col("SELECT DISTINCT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_dcn_path' ORDER BY meta_value");
         $base  = admin_url('admin.php?page=dcn-notes');
         ?>
-        <div class="wrap">
+        <div class="wrap dcn-wrap">
             <h1 class="wp-heading-inline">Note del cliente</h1>
             <?php if (!Plugin::enabled()) : ?><p><strong>Le note sono spente.</strong> <a href="<?php echo esc_url(admin_url('admin.php?page=dcn-settings')); ?>">Attivale nelle impostazioni</a> (solo staging).</p><?php endif; ?>
             <ul class="subsubsub">
@@ -147,6 +165,7 @@ class Admin
             </table>
             <?php
             echo '<div class="tablenav"><div class="tablenav-pages">' . wp_kses_post((string) paginate_links(['base' => add_query_arg('paged', '%#%'), 'format' => '', 'current' => $paged, 'total' => max(1, (int) $q->max_num_pages)])) . '</div></div>';
+            echo self::signature(); // statica
             ?>
         </div>
         <?php
@@ -164,14 +183,14 @@ class Admin
     {
         $post = get_post($id);
         if (!$post || $post->post_type !== Plugin::NOTE) {
-            echo '<div class="wrap"><h1>Nota non trovata</h1></div>';
+            echo '<div class="wrap dcn-wrap"><h1>Nota non trovata</h1></div>';
 
             return;
         }
         $n    = Plugin::format($post);
         $view = add_query_arg('dcn', 'n', home_url($n['path'])) . '#dcn-' . $n['id'];
         ?>
-        <div class="wrap">
+        <div class="wrap dcn-wrap">
             <h1 class="wp-heading-inline">Nota #<?php echo (int) $n['n']; ?></h1>
             <a href="<?php echo esc_url(admin_url('admin.php?page=dcn-notes')); ?>" class="page-title-action">← Tutte le note</a>
             <?php if (isset($_GET['done'])) : ?><div class="notice notice-success is-dismissible"><p>Fatto.</p></div><?php endif; ?>
@@ -221,6 +240,7 @@ class Admin
                     </div>
                 </div>
             </div>
+            <?php echo self::signature(); // statica ?>
         </div>
         <?php
     }

@@ -1,5 +1,7 @@
 # DUNK Client Notes
 
+_by DUNK_ · font **DM Sans** (file incluso in `assets/fonts/`, licenza OFL: nessuna richiesta a Google Fonts).
+
 Note e commenti del cliente direttamente sulle pagine dello **staging**, senza strumenti esterni né account.
 
 ## Cosa fa

@@ -45,6 +45,10 @@
     const shadow = host.attachShadow({ mode: 'open' })
     const root = h('div', { class: 'dcn' })
     shadow.append(h('style', {}, cfg.css), root)
+    // i @font-face dentro uno Shadow DOM non vengono caricati: vanno nel documento (il nome del font vale anche dentro)
+    if (cfg.font && !document.getElementById('dcn-font')) {
+        document.head.append(h('style', { id: 'dcn-font' }, `@font-face{font-family:'DM Sans';font-style:normal;font-weight:100 1000;font-display:swap;src:url('${cfg.font}') format('woff2');}`))
+    }
 
     const pinsLayer = h('div')
     const hl = h('div', { class: 'hl', hidden: true })
@@ -161,9 +165,11 @@
             h('button', { class: 'icon', type: 'button', 'aria-label': 'Chiudi', onclick: () => { panel.hidden = true } }, '✕')
         )
         const body = h('div', { class: 'body' })
-        panel.replaceChildren(...[head, state.view === 'note' ? null : toolbar(), body].filter(Boolean))
+        panel.replaceChildren(...[head, state.view === 'note' ? null : toolbar(), body, byDunk()].filter(Boolean))
         state.view === 'note' ? renderNote(body) : renderList(body)
     }
+
+    const byDunk = () => h('a', { class: 'by-dunk', href: 'https://thedunk.it', target: '_blank', rel: 'noopener' }, 'by ', h('strong', {}, 'DUNK'))
 
     const toolbar = () => h('div', { class: 'tools' },
         h('button', { class: 'btn primary', type: 'button', onclick: startPick }, '+ Nuova nota'),
