@@ -169,8 +169,8 @@
         h('button', { class: 'btn primary', type: 'button', onclick: startPick }, '+ Nuova nota'),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Risolte'),
         h('div', { class: 'tabs', role: 'tablist' },
-            h('button', { class: 'tab', role: 'tab', 'aria-selected': state.tab === 'page', onclick: () => { state.tab = 'page'; renderPanel() } }, 'Questa pagina'),
-            h('button', { class: 'tab', role: 'tab', 'aria-selected': state.tab === 'all', onclick: async () => { state.tab = 'all'; if (!state.all) { try { state.all = await api('/notes') } catch (e) { toast(e.message) } } renderPanel() } }, 'Tutte')
+            h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page'), onclick: () => { state.tab = 'page'; renderPanel() } }, 'Questa pagina'),
+            h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all'), onclick: async () => { state.tab = 'all'; if (!state.all) { try { state.all = await api('/notes') } catch (e) { toast(e.message) } } renderPanel() } }, 'Tutte')
         )
     )
 
@@ -304,8 +304,8 @@
             const ctx = canvas.getContext('2d')
             const x = cx * scale, y = cy * scale, r = 16 * scale
             ctx.lineWidth = Math.max(3, 4 * scale)
-            ctx.strokeStyle = '#e11d48'
-            ctx.fillStyle = 'rgba(225,29,72,.18)'
+            ctx.strokeStyle = '#0a0a0a'
+            ctx.fillStyle = 'rgba(254,224,0,.55)'
             ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
             return canvas.toDataURL('image/jpeg', 0.72)
         } catch { return '' }

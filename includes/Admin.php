@@ -154,9 +154,10 @@ class Admin
 
     private static function badge(string $status): string
     {
-        $c = ['open' => '#e11d48', 'progress' => '#d97706', 'resolved' => '#16a34a'][$status] ?? '#666';
+        // giallo e nero DUNK: distinti dai colori del sito
+        [$bg, $fg] = ['open' => ['#fee000', '#0a0a0a'], 'progress' => ['#0a0a0a', '#fee000'], 'resolved' => ['#d9d9d4', '#0a0a0a']][$status] ?? ['#d9d9d4', '#0a0a0a'];
 
-        return '<span style="display:inline-block;padding:2px 10px;border-radius:99px;background:' . esc_attr($c) . ';color:#fff;font-size:12px;font-weight:600">' . esc_html(self::STATUS_LABEL[$status] ?? $status) . '</span>';
+        return '<span style="display:inline-block;padding:2px 10px;border:1px solid #0a0a0a;border-radius:99px;background:' . esc_attr($bg) . ';color:' . esc_attr($fg) . ';font-size:12px;font-weight:600">' . esc_html(self::STATUS_LABEL[$status] ?? $status) . '</span>';
     }
 
     private static function detail(int $id): void
@@ -184,7 +185,7 @@ class Admin
                     </div>
                     <h2>Conversazione</h2>
                     <?php foreach ($n['replies'] as $r) : ?>
-                        <div class="postbox" style="padding:10px 16px;<?php echo $r['source'] === 'team' ? 'border-left:4px solid #a686bd' : ''; ?>">
+                        <div class="postbox" style="padding:10px 16px;<?php echo $r['source'] === 'team' ? 'border-left:4px solid #fee000' : ''; ?>">
                             <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?> · <small><?php echo esc_html($r['date']); ?></small>
                             <p style="white-space:pre-wrap;margin-bottom:0"><?php echo esc_html($r['text']); ?></p>
                         </div>

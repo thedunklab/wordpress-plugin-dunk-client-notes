@@ -14,6 +14,9 @@ Note e commenti del cliente direttamente sulle pagine dello **staging**, senza s
 3. Il cliente apre il sito dello staging (già protetto da password) e vede il pulsante **Note** in basso a destra. Aggiungi `?dcn=off` all'indirizzo per nasconderlo.
 4. A fine revisione: disattiva (o rimuovi) il plugin prima di andare in produzione. Con le note attive le pagine sono `noindex`.
 
+## Aspetto
+Colori **DUNK**: giallo `#fee000` e nero `#0a0a0a` (puntine, pulsanti, pannello, bacheca), apposta diversi dal viola del sito per non confondere le note con il design. Stati: aperta = giallo, in lavorazione = nero, risolta = grigio. L'interfaccia sta in uno Shadow DOM e non eredita gli stili del sito.
+
 ## Sicurezza e privacy
 - Chi scrive non ha un account: la chiave `X-DCN-Token` (derivata dai salt del sito) viene stampata nelle pagine, che sono già dietro la password dello staging. Le scritture sono limitate (40 ogni 10 minuti per IP), i testi a 2000 caratteri e lo screenshot a 2,5 MB, solo JPEG validato.
 - I redattori loggati scrivono come «team»; solo loro cambiano lo stato.
