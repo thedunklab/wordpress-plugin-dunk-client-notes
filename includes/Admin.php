@@ -57,6 +57,7 @@ class Admin
         register_setting('dcn', 'dcn_enabled', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_mail', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_emails', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('dcn', 'dcn_notify_user', ['type' => 'integer', 'sanitize_callback' => 'absint']);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     }
 
@@ -86,6 +87,13 @@ class Admin
                             <label><input type="checkbox" name="dcn_mail" value="1" <?php checked((bool) get_option('dcn_mail', 1)); ?>> Avvisami a ogni nuova nota e risposta del cliente</label><br>
                             <input type="text" name="dcn_emails" class="regular-text" value="<?php echo esc_attr((string) get_option('dcn_emails', get_option('admin_email'))); ?>">
                             <p class="description">Uno o più indirizzi, separati da virgola.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="dcn_notify_user">Avviso «Note pronte»</label></th>
+                        <td>
+                            <?php wp_dropdown_users(['name' => 'dcn_notify_user', 'id' => 'dcn_notify_user', 'selected' => (int) get_option('dcn_notify_user', 0), 'show_option_none' => '— Nessuno (pulsante nascosto) —', 'option_none_value' => 0, 'capability' => 'edit_posts']); ?>
+                            <p class="description">Quando il cliente preme «Segnala note pronte» nel pannello, questa persona riceve <strong>una sola email per pagina</strong> con l'elenco delle note aperte (non una per nota).</p>
                         </td>
                     </tr>
                 </table>

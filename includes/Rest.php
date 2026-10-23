@@ -26,6 +26,10 @@ class Rest
         register_rest_route(self::NS, '/notes/(?P<id>\d+)/replies', [
             ['methods' => 'POST', 'callback' => [self::class, 'reply'], 'permission_callback' => [self::class, 'can_use']],
         ]);
+        register_rest_route(self::NS, '/ready', [
+            ['methods' => 'GET', 'callback' => [self::class, 'ready_state'], 'permission_callback' => [self::class, 'can_use']],
+            ['methods' => 'POST', 'callback' => [self::class, 'ready_send'], 'permission_callback' => [self::class, 'can_use']],
+        ]);
         register_rest_route(self::NS, '/notes/(?P<id>\d+)/status', [
             ['methods' => 'POST', 'callback' => [self::class, 'status'], 'permission_callback' => static fn () => Plugin::enabled() && current_user_can('edit_posts')],
         ]);
@@ -162,6 +166,84 @@ class Rest
         update_post_meta($note->ID, '_dcn_status', $status);
 
         return new \WP_REST_Response(Plugin::format($note));
+    }
+
+    /** GET /ready?path=/pagina/ → ultimo avviso «note pronte» inviato per quella pagina (se c'è). */
+    public static function ready_state(\WP_REST_Request $r): \WP_REST_Response
+    {
+        return new \WP_REST_Response(self::ready_info(Plugin::normalize_path((string) $r->get_param('path'))));
+    }
+
+    /**
+     * POST /ready {path} → una sola email per pagina al destinatario scelto nelle impostazioni, con l'elenco delle note aperte.
+     * Si può rinviare (dopo nuove note); la stessa pagina non può partire più di una volta ogni 2 minuti.
+     */
+    public static function ready_send(\WP_REST_Request $r)
+    {
+        $user = Plugin::ready_user();
+        if (!$user) {
+            return new \WP_Error('dcn_nouser', 'Il destinatario dell\'avviso non è configurato.', ['status' => 409]);
+        }
+        if ($e = self::throttle()) {
+            return $e;
+        }
+
+        $path  = Plugin::normalize_path((string) $r->get_param('path'));
+        $ready = (array) get_option('dcn_ready', []);
+        if (isset($ready[$path]['at']) && time() - (int) $ready[$path]['at'] < 2 * MINUTE_IN_SECONDS) {
+            return new \WP_Error('dcn_wait', 'Avviso appena inviato per questa pagina.', ['status' => 429]);
+        }
+
+        $notes = get_posts(['post_type' => Plugin::NOTE, 'post_status' => 'publish', 'posts_per_page' => 200, 'orderby' => 'date', 'order' => 'ASC',
+            'meta_query' => [['key' => '_dcn_path', 'value' => $path], ['key' => '_dcn_status', 'value' => 'open']]]);
+        if (!$notes) {
+            return new \WP_Error('dcn_empty', 'Su questa pagina non ci sono note aperte.', ['status' => 400]);
+        }
+
+        $author = self::author($r);
+        $prev   = array_map('intval', (array) ($ready[$path]['ids'] ?? []));
+        $ids    = [];
+        $lines  = [];
+        foreach ($notes as $p) {
+            $ids[]   = $p->ID;
+            $lines[] = sprintf('#%d%s · %s: %s', (int) get_post_meta($p->ID, '_dcn_n', true), $prev && !in_array($p->ID, $prev, true) ? ' (nuova)' : '', get_post_meta($p->ID, '_dcn_author', true), mb_substr(str_replace(["\r", "\n"], ' ', $p->post_content), 0, 140));
+        }
+        $count = count($notes);
+        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path)));
+        $list  = admin_url('admin.php?page=dcn-notes&status=open&path=' . rawurlencode($path));
+
+        $body = "Ciao {$user->display_name},\n\n$author ha segnalato che le note della pagina $path sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ").\n\n"
+            . implode("\n", $lines)
+            . "\n\nApri la pagina con le note: $link\nElenco in bacheca: $list\n";
+        $sent = wp_mail($user->user_email, '[' . Plugin::label() . '] Note pronte: ' . $path . ' (' . $count . ')', $body);
+        if (!$sent) {
+            return new \WP_Error('dcn_mail', 'Non è stato possibile inviare l\'email.', ['status' => 500]);
+        }
+
+        $ready[$path] = ['at' => time(), 'by' => $author, 'to' => $user->display_name, 'ids' => $ids];
+        update_option('dcn_ready', $ready, false);
+
+        return new \WP_REST_Response(self::ready_info($path), 201);
+    }
+
+    /** Stato dell'avviso per una pagina: quando, da chi, a chi e quante note aperte sono arrivate dopo. */
+    private static function ready_info(string $path): array
+    {
+        $row = ((array) get_option('dcn_ready', []))[$path] ?? null;
+        if (!$row) {
+            return ['sent' => false];
+        }
+        $open = get_posts(['post_type' => Plugin::NOTE, 'post_status' => 'publish', 'posts_per_page' => 200, 'fields' => 'ids',
+            'meta_query' => [['key' => '_dcn_path', 'value' => $path], ['key' => '_dcn_status', 'value' => 'open']]]);
+
+        return [
+            'sent'  => true,
+            'date'  => wp_date('j M Y, H:i', (int) $row['at']),
+            'by'    => (string) $row['by'],
+            'to'    => (string) $row['to'],
+            'count' => count((array) $row['ids']),
+            'fresh' => count(array_diff($open, array_map('intval', (array) $row['ids']))),
+        ];
     }
 
     /* ---- supporto ---- */

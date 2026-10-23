@@ -89,6 +89,7 @@ class Plugin
             'team'   => $team,
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
+            'ready'  => (bool) self::ready_user(),
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');
@@ -167,6 +168,15 @@ class Plugin
     private static function human_date(\WP_Post $p): string
     {
         return wp_date('j M Y, H:i', strtotime($p->post_date_gmt . ' UTC') ?: null);
+    }
+
+    /** Utente WordPress che riceve l'avviso «note pronte» (Impostazioni); null se non scelto o non più valido. */
+    public static function ready_user(): ?\WP_User
+    {
+        $id   = (int) get_option('dcn_notify_user', 0);
+        $user = $id ? get_userdata($id) : false;
+
+        return $user && is_email($user->user_email) ? $user : null;
     }
 
     /** Invia un'email al team (se attivo nelle impostazioni). */

@@ -10,7 +10,7 @@
 
     const normPath = (p) => (p.endsWith('/') ? p : p + '/')
     const path = normPath(location.pathname)
-    const state = { notes: [], all: null, tab: 'page', view: 'list', current: 0, resolved: false, picking: false, composer: null }
+    const state = { notes: [], all: null, tab: 'page', view: 'list', ready: null, current: 0, resolved: false, picking: false, composer: null }
 
     /* ---------- utilità ---------- */
     const h = (tag, attrs = {}, ...kids) => {
@@ -117,6 +117,7 @@
         try {
             state.all = await api('/notes')
             state.notes = state.all.filter((n) => n.path === path)
+            if (cfg.ready) state.ready = await api('/ready?path=' + encodeURIComponent(path))
         } catch (e) { toast(e.message) }
         render()
     }
@@ -190,8 +191,38 @@
             h('div', { class: 'tools-row sub' },
                 h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Mostra risolte'),
                 h('span', { class: 'count' }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
-            )
+            ),
+            readyBox()
         )
+    }
+
+    /* avviso «note pronte»: una sola email per pagina, non una per nota */
+    const readyBox = () => {
+        const open = state.notes.filter((n) => n.status === 'open').length
+        if (!cfg.ready || state.tab !== 'page' || (!open && !state.ready?.sent)) return null
+        const r = state.ready || { sent: false }
+        const btn = h('button', { class: 'btn primary', type: 'button', disabled: !open, onclick: () => sendReady(btn) }, r.sent ? 'Invia di nuovo' : 'Segnala note pronte')
+        return h('div', { class: 'ready' },
+            h('div', { class: 'ready-txt' },
+                r.sent ? h('b', {}, `Avviso inviato a ${r.to}`) : h('b', {}, 'Hai finito con questa pagina?'),
+                r.sent ? h('span', {}, `${r.date} · ${r.count} not${r.count === 1 ? 'a' : 'e'}${r.fresh ? ` · ${r.fresh} nuov${r.fresh === 1 ? 'a' : 'e'} dopo l’invio` : ''}`) : h('span', {}, 'Avvisa il team che le note sono pronte da mettere in lavorazione.')),
+            btn)
+    }
+    const sendReady = async (btn) => {
+        const r = state.ready
+        if (r?.sent && !r.fresh && !confirm('Non ci sono nuove note dall’ultimo avviso. Inviarlo di nuovo?')) return
+        let name = cfg.user
+        if (!cfg.team) {
+            name = savedName() || (prompt('Il tuo nome') || '').trim()
+            if (!name) return
+            saveName(name)
+        }
+        btn.disabled = true
+        try {
+            state.ready = await api('/ready', { method: 'POST', body: { path, author: name } })
+            toast('Avviso inviato.')
+        } catch (e) { toast(e.message) }
+        renderPanel()
     }
 
     const renderList = (body) => {

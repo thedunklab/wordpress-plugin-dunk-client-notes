@@ -9,6 +9,7 @@ Note e commenti del cliente direttamente sulle pagine dello **staging**, senza s
 - **Screenshot automatico** (opzionale, attivo di default) della parte visibile della pagina, con un cerchio rosso sul punto scelto. Usa `html2canvas-pro` (incluso, MIT) e si salva in `uploads/dunk-notes/`.
 - Sulla pagina compaiono le **puntine** numerate (colore per stato: aperta, in lavorazione, risolta), il **pannello** con l'elenco della pagina e di tutto il sito, la conversazione (il cliente e il team rispondono nella stessa nota).
 - **Bacheca → Note cliente**: elenco con filtri per stato e pagina, scheda della nota con screenshot, risposte, cambio stato, eliminazione, link "Apri la pagina nel punto della nota". Email al team a ogni nuova nota o risposta del cliente.
+- **Avviso «Note pronte»** (per pagina, non per nota): nel pannello, tab «Pagina», il pulsante **Segnala note pronte** manda *una* email alla persona scelta in **Impostazioni → Avviso «Note pronte»** (un utente WordPress), con l'elenco delle note aperte e i link. Dopo l'invio il pannello mostra «Avviso inviato a … · data · N note»; si può rinviare (con conferma se non ci sono nuove note), le nuove sono marcate «(nuova)» nell'email. Stessa pagina: almeno 2 minuti tra due invii. Senza destinatario scelto il pulsante non compare.
 
 ## Uso
 1. Copia la cartella in `wp-content/plugins/` e attiva il plugin.
