@@ -180,14 +180,14 @@ class Plugin
     }
 
     /** Invia un'email al team (se attivo nelle impostazioni). */
-    public static function notify(string $subject, string $body): void
+    public static function notify(string $subject, string $body, array $spec = []): void
     {
         if (!get_option('dcn_mail', 1)) {
             return;
         }
         $to = array_filter(array_map('trim', explode(',', (string) get_option('dcn_emails', get_option('admin_email')))), 'is_email');
         if ($to) {
-            wp_mail($to, '[' . self::label() . '] ' . $subject, $body);
+            $spec ? Mail::send($to, '[' . self::label() . '] ' . $subject, $spec + ['project' => self::label()], $body) : wp_mail($to, '[' . self::label() . '] ' . $subject, $body);
         }
     }
 }

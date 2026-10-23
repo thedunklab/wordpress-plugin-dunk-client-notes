@@ -121,7 +121,12 @@ class Rest
         }
 
         $link = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $id;
-        Plugin::notify('Nuova nota #' . $n . ' su ' . $path, "$author ha scritto:\n\n$text\n\nApri la nota: $link\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $id));
+        Plugin::notify('Nuova nota #' . $n . ' su ' . $path, "$author ha scritto:\n\n$text\n\nApri la nota: $link\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $id), [
+            'title'   => 'Nuova nota #' . $n,
+            'intro'   => "$author ha scritto una nota sulla pagina $path.",
+            'items'   => [['n' => $n, 'author' => $author, 'text' => $text]],
+            'buttons' => [['label' => 'Apri la nota', 'url' => $link, 'primary' => true], ['label' => 'Gestisci in bacheca', 'url' => admin_url('admin.php?page=dcn-notes&note=' . $id)]],
+        ]);
 
         return new \WP_REST_Response(Plugin::format(get_post($id)), 201);
     }
@@ -150,7 +155,12 @@ class Rest
 
         if (!self::is_team()) {
             $n = (int) get_post_meta($note->ID, '_dcn_n', true);
-            Plugin::notify('Risposta alla nota #' . $n, "$author ha risposto:\n\n$text\n\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $note->ID));
+            Plugin::notify('Risposta alla nota #' . $n, "$author ha risposto:\n\n$text\n\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $note->ID), [
+                'title'   => 'Risposta alla nota #' . $n,
+                'intro'   => "$author ha risposto alla nota #$n.",
+                'items'   => [['n' => $n, 'author' => $author, 'text' => $text]],
+                'buttons' => [['label' => 'Gestisci in bacheca', 'url' => admin_url('admin.php?page=dcn-notes&note=' . $note->ID), 'primary' => true]],
+            ]);
         }
 
         return new \WP_REST_Response(Plugin::format($note), 201);
@@ -204,8 +214,10 @@ class Rest
         $prev   = array_map('intval', (array) ($ready[$path]['ids'] ?? []));
         $ids    = [];
         $lines  = [];
+        $items  = [];
         foreach ($notes as $p) {
             $ids[]   = $p->ID;
+            $items[] = ['n' => (int) get_post_meta($p->ID, '_dcn_n', true), 'author' => (string) get_post_meta($p->ID, '_dcn_author', true), 'text' => mb_substr(str_replace(["\r", "\n"], ' ', $p->post_content), 0, 140), 'new' => $prev && !in_array($p->ID, $prev, true)];
             $lines[] = sprintf('#%d%s · %s: %s', (int) get_post_meta($p->ID, '_dcn_n', true), $prev && !in_array($p->ID, $prev, true) ? ' (nuova)' : '', get_post_meta($p->ID, '_dcn_author', true), mb_substr(str_replace(["\r", "\n"], ' ', $p->post_content), 0, 140));
         }
         $count = count($notes);
@@ -215,7 +227,13 @@ class Rest
         $body = "Ciao {$user->display_name},\n\n$author ha segnalato che le note della pagina $path sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ").\n\n"
             . implode("\n", $lines)
             . "\n\nApri la pagina con le note: $link\nElenco in bacheca: $list\n";
-        $sent = wp_mail($user->user_email, '[' . Plugin::label() . '] Note pronte: ' . $path . ' (' . $count . ')', $body);
+        $sent = Mail::send($user->user_email, '[' . Plugin::label() . '] Note pronte: ' . $path . ' (' . $count . ')', [
+            'project' => Plugin::label(),
+            'title'   => 'Note pronte: ' . $path,
+            'intro'   => "Ciao {$user->display_name},\n$author ha segnalato che le note di questa pagina sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ').',
+            'items'   => $items,
+            'buttons' => [['label' => 'Apri la pagina con le note', 'url' => $link, 'primary' => true], ['label' => 'Elenco in bacheca', 'url' => $list]],
+        ], $body);
         if (!$sent) {
             return new \WP_Error('dcn_mail', 'Non è stato possibile inviare l\'email.', ['status' => 500]);
         }
