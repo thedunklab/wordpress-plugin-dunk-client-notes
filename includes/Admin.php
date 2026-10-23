@@ -17,6 +17,7 @@ class Admin
         add_action('admin_init', [self::class, 'settings']);
         add_action('admin_post_dcn_reply', [self::class, 'handle_reply']);
         add_action('admin_post_dcn_status', [self::class, 'handle_status']);
+        add_action('admin_post_dcn_testmail', [self::class, 'handle_testmail']);
         add_action('admin_post_dcn_delete', [self::class, 'handle_delete']);
         add_action('admin_notices', [self::class, 'notice']);
         add_action('admin_head', [self::class, 'font']);
@@ -45,8 +46,27 @@ class Admin
         add_submenu_page('dcn-notes', 'Impostazioni note', 'Impostazioni', 'manage_options', 'dcn-settings', [self::class, 'settings_page']);
     }
 
+    public static function handle_testmail(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Permesso negato.');
+        }
+        check_admin_referer('dcn_testmail');
+        $err = Mail::test(wp_get_current_user()->user_email);
+        set_transient('dcn_testmail_' . get_current_user_id(), $err === '' ? 'ok' : $err, 60);
+        wp_safe_redirect(admin_url('admin.php?page=dcn-settings'));
+        exit;
+    }
+
     public static function notice(): void
     {
+        $key = 'dcn_testmail_' . get_current_user_id();
+        if ($res = get_transient($key)) {
+            delete_transient($key);
+            echo $res === 'ok'
+                ? '<div class="notice notice-success"><p>Email di prova inviata: controlla la posta (anche lo spam).</p></div>'
+                : '<div class="notice notice-error"><p><strong>Invio non riuscito:</strong> ' . esc_html((string) $res) . '</p></div>';
+        }
         if (Plugin::enabled() && current_user_can('manage_options') && (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'production') && !defined('DUNK_NOTES_ENABLED')) {
             echo '<div class="notice notice-warning"><p><strong>Note cliente attive.</strong> Ricordati di disattivarle prima di mettere il sito online (Note cliente → Impostazioni).</p></div>';
         }
@@ -58,6 +78,13 @@ class Admin
         register_setting('dcn', 'dcn_mail', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_emails', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_notify_user', ['type' => 'integer', 'sanitize_callback' => 'absint']);
+        register_setting('dcn', 'dcn_smtp_host', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('dcn', 'dcn_smtp_port', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => (int) $v ?: 587]);
+        register_setting('dcn', 'dcn_smtp_user', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        // password: se il campo resta vuoto si tiene quella già salvata
+        register_setting('dcn', 'dcn_smtp_pass', ['type' => 'string', 'sanitize_callback' => static fn ($v) => trim((string) $v) !== '' ? trim((string) $v) : (string) get_option('dcn_smtp_pass', '')]);
+        register_setting('dcn', 'dcn_smtp_from', ['type' => 'string', 'sanitize_callback' => 'sanitize_email']);
+        register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     }
 
@@ -96,9 +123,27 @@ class Admin
                             <p class="description">Quando il cliente preme «Segnala note pronte» nel pannello, questa persona riceve <strong>una sola email per pagina</strong> con l'elenco delle note aperte (non una per nota).</p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row">Invio email (SMTP)</th>
+                        <td>
+                            <p class="description" style="margin-top:0">Senza SMTP le email partono dal server dello staging, non autenticate, e spesso non arrivano. Con MailerSend: host <code>smtp.mailersend.net</code>, porta 587, utente e password dalle credenziali SMTP del dominio, mittente di un dominio verificato.</p>
+                            <p><input type="text" name="dcn_smtp_host" class="regular-text" placeholder="smtp.mailersend.net" value="<?php echo esc_attr((string) get_option('dcn_smtp_host', '')); ?>"> <input type="number" name="dcn_smtp_port" class="small-text" placeholder="587" value="<?php echo esc_attr((string) get_option('dcn_smtp_port', 587)); ?>"></p>
+                            <p><input type="text" name="dcn_smtp_user" class="regular-text" placeholder="Utente SMTP" autocomplete="off" value="<?php echo esc_attr((string) get_option('dcn_smtp_user', '')); ?>"></p>
+                            <p><input type="password" name="dcn_smtp_pass" class="regular-text" placeholder="<?php echo get_option('dcn_smtp_pass') ? '•••••••• (salvata: lascia vuoto per non cambiarla)' : 'Password SMTP'; ?>" autocomplete="new-password"></p>
+                            <p><input type="email" name="dcn_smtp_from" class="regular-text" placeholder="Email mittente (es. note@dunklab.it)" value="<?php echo esc_attr((string) get_option('dcn_smtp_from', '')); ?>"> <input type="text" name="dcn_smtp_name" class="regular-text" placeholder="Nome mittente" value="<?php echo esc_attr((string) get_option('dcn_smtp_name', '')); ?>"></p>
+                            <p class="description"><?php echo Mail::ready() ? '<strong>SMTP attivo.</strong>' : 'SMTP non attivo (servono host, utente e password).'; ?></p>
+                        </td>
+                    </tr>
                 </table>
                 <?php submit_button(); ?>
             </form>
+            <?php if (Mail::ready()) : $me = wp_get_current_user(); ?>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('dcn_testmail'); ?>
+                    <input type="hidden" name="action" value="dcn_testmail">
+                    <button class="button">Invia email di prova a <?php echo esc_html($me->user_email); ?></button>
+                </form>
+            <?php endif; ?>
             <?php echo self::signature(); // statica ?>
         </div>
         <?php

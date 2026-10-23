@@ -25,7 +25,9 @@ define('DCN_URL', plugin_dir_url(__FILE__));
 
 require_once DCN_DIR . 'includes/Plugin.php';
 require_once DCN_DIR . 'includes/Rest.php';
+require_once DCN_DIR . 'includes/Mail.php';
 require_once DCN_DIR . 'includes/Admin.php';
 
 Plugin::init();
+Mail::init();
 Admin::init();
