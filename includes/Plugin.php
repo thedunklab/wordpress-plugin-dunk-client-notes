@@ -89,7 +89,7 @@ class Plugin
             'team'   => $team,
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
-            'ready'  => (bool) self::ready_users(),
+            'ready'  => !$team && (bool) self::ready_users(), // lo segnala il cliente: chi è nel team lo riceve
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');
