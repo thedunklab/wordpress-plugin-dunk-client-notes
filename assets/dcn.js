@@ -195,10 +195,7 @@
         if (!state.contacts.length) { body.append(h('div', { class: 'empty' }, 'Nessuna persona aggiunta.')); return }
         state.contacts.forEach((c) => body.append(h('div', { class: 'contact' },
             h('span', { class: 'avatar' }, c.name.trim().charAt(0).toUpperCase()),
-            h('span', { class: 'contact-info' }, h('b', {}, c.name), h('span', { class: 'meta' }, c.email)),
-            h('button', { class: 'icon', type: 'button', title: 'Rimuovi', 'aria-label': 'Rimuovi ' + c.name, onclick: async () => {
-                try { state.contacts = await api('/contacts/' + c.id, { method: 'DELETE' }); renderPanel() } catch (err) { toast(err.message) }
-            } }, '✕')
+            h('span', { class: 'contact-info' }, h('b', {}, c.name), h('span', { class: 'meta' }, c.email))
         )))
     }
 

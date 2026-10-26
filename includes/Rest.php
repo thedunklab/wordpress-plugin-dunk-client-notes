@@ -30,9 +30,6 @@ class Rest
             ['methods' => 'GET', 'callback' => [self::class, 'contacts_list'], 'permission_callback' => [self::class, 'can_use']],
             ['methods' => 'POST', 'callback' => [self::class, 'contacts_add'], 'permission_callback' => [self::class, 'can_use']],
         ]);
-        register_rest_route(self::NS, '/contacts/(?P<cid>[a-f0-9]{10})', [
-            ['methods' => 'DELETE', 'callback' => [self::class, 'contacts_remove'], 'permission_callback' => [self::class, 'can_use']],
-        ]);
         register_rest_route(self::NS, '/ready', [
             ['methods' => 'GET', 'callback' => [self::class, 'ready_state'], 'permission_callback' => [self::class, 'can_use']],
             ['methods' => 'POST', 'callback' => [self::class, 'ready_send'], 'permission_callback' => [self::class, 'can_use']],
@@ -216,14 +213,6 @@ class Rest
         update_option('dcn_contacts', $list, false);
 
         return new \WP_REST_Response($list, 201);
-    }
-
-    public static function contacts_remove(\WP_REST_Request $r): \WP_REST_Response
-    {
-        $list = array_values(array_filter(Plugin::contacts(), static fn ($c) => $c['id'] !== (string) $r['cid']));
-        update_option('dcn_contacts', $list, false);
-
-        return new \WP_REST_Response($list);
     }
 
     /**

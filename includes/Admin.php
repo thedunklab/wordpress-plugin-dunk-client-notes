@@ -98,6 +98,7 @@ class Admin
             return;
         }
         $people = Plugin::contacts();
+        $admin  = current_user_can('manage_options');
         $msg    = (string) ($_GET['msg'] ?? '');
         ?>
         <div class="wrap dcn-wrap">
@@ -114,24 +115,25 @@ class Admin
                 <button class="button button-primary">Aggiungi</button>
             </form>
             <table class="wp-list-table widefat striped" style="max-width:760px">
-                <thead><tr><th>Nome e cognome</th><th>Email</th><th style="width:110px"></th></tr></thead>
+                <thead><tr><th>Nome e cognome</th><th>Email</th><?php if ($admin) : ?><th style="width:110px"></th><?php endif; ?></tr></thead>
                 <tbody>
-                <?php if (!$people) : ?><tr><td colspan="3">Nessuna persona aggiunta.</td></tr><?php endif; ?>
+                <?php if (!$people) : ?><tr><td colspan="<?php echo $admin ? 3 : 2; ?>">Nessuna persona aggiunta.</td></tr><?php endif; ?>
                 <?php foreach ($people as $c) : ?>
                     <tr>
                         <td><strong><?php echo esc_html($c['name']); ?></strong></td>
                         <td><a href="mailto:<?php echo esc_attr($c['email']); ?>"><?php echo esc_html($c['email']); ?></a></td>
-                        <td>
+                        <?php if ($admin) : ?><td>
                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Rimuovere questa persona dalla rubrica?')">
                                 <?php wp_nonce_field('dcn_contact_remove_' . $c['id']); ?>
                                 <input type="hidden" name="action" value="dcn_contact_remove"><input type="hidden" name="cid" value="<?php echo esc_attr($c['id']); ?>">
                                 <button class="button button-link-delete">Rimuovi</button>
                             </form>
-                        </td>
+                        </td><?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php if (!$admin) : ?><p class="description">Solo un amministratore può rimuovere le persone dalla rubrica.</p><?php endif; ?>
             <?php echo self::signature(); // statica ?>
         </div>
         <?php
@@ -162,7 +164,7 @@ class Admin
     public static function handle_contact_remove(): void
     {
         $id = sanitize_key((string) ($_POST['cid'] ?? ''));
-        if (!current_user_can('edit_posts')) {
+        if (!current_user_can('manage_options')) {
             wp_die('Permesso negato.');
         }
         check_admin_referer('dcn_contact_remove_' . $id);
