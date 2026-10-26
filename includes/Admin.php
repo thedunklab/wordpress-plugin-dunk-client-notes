@@ -18,6 +18,8 @@ class Admin
         add_action('admin_post_dcn_reply', [self::class, 'handle_reply']);
         add_action('admin_post_dcn_status', [self::class, 'handle_status']);
         add_action('admin_post_dcn_testmail', [self::class, 'handle_testmail']);
+        add_action('admin_post_dcn_contact_add', [self::class, 'handle_contact_add']);
+        add_action('admin_post_dcn_contact_remove', [self::class, 'handle_contact_remove']);
         add_action('admin_post_dcn_delete', [self::class, 'handle_delete']);
         add_action('admin_notices', [self::class, 'notice']);
         add_action('admin_head', [self::class, 'font']);
@@ -43,6 +45,7 @@ class Admin
     {
         add_menu_page('Note del cliente', 'Note cliente', 'edit_posts', 'dcn-notes', [self::class, 'page'], 'dashicons-format-chat', 26);
         add_submenu_page('dcn-notes', 'Note del cliente', 'Tutte le note', 'edit_posts', 'dcn-notes', [self::class, 'page']);
+        add_submenu_page('dcn-notes', 'Persone esterne', 'Persone esterne', 'edit_posts', 'dcn-people', [self::class, 'people_page']);
         add_submenu_page('dcn-notes', 'Impostazioni note', 'Impostazioni', 'manage_options', 'dcn-settings', [self::class, 'settings_page']);
     }
 
@@ -86,6 +89,86 @@ class Admin
         register_setting('dcn', 'dcn_smtp_from', ['type' => 'string', 'sanitize_callback' => 'sanitize_email']);
         register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+    }
+
+    /** Rubrica delle persone esterne al team (le stesse del pannello sul sito): elenco, aggiunta e rimozione. */
+    public static function people_page(): void
+    {
+        if (!current_user_can('edit_posts')) {
+            return;
+        }
+        $people = Plugin::contacts();
+        $msg    = (string) ($_GET['msg'] ?? '');
+        ?>
+        <div class="wrap dcn-wrap">
+            <h1>Persone esterne</h1>
+            <?php if ($msg === 'added') : ?><div class="notice notice-success is-dismissible"><p>Persona aggiunta.</p></div><?php endif; ?>
+            <?php if ($msg === 'removed') : ?><div class="notice notice-success is-dismissible"><p>Persona rimossa.</p></div><?php endif; ?>
+            <?php if ($msg === 'invalid') : ?><div class="notice notice-error is-dismissible"><p>Inserisci nome e cognome e un indirizzo email valido.</p></div><?php endif; ?>
+            <p class="description" style="max-width:640px">Chi è fuori dal team e puoi coinvolgere sulle note: scrivendo una nota o una risposta (anche dal pannello sul sito) si possono segnalare a queste persone, che ricevono una email con il testo e il link. Non sono utenti di WordPress e non hanno accesso alla bacheca.</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0">
+                <?php wp_nonce_field('dcn_contact_add'); ?>
+                <input type="hidden" name="action" value="dcn_contact_add">
+                <input type="text" name="name" class="regular-text" placeholder="Nome e cognome" maxlength="80" required>
+                <input type="email" name="email" class="regular-text" placeholder="Email" maxlength="120" required>
+                <button class="button button-primary">Aggiungi</button>
+            </form>
+            <table class="wp-list-table widefat striped" style="max-width:760px">
+                <thead><tr><th>Nome e cognome</th><th>Email</th><th style="width:110px"></th></tr></thead>
+                <tbody>
+                <?php if (!$people) : ?><tr><td colspan="3">Nessuna persona aggiunta.</td></tr><?php endif; ?>
+                <?php foreach ($people as $c) : ?>
+                    <tr>
+                        <td><strong><?php echo esc_html($c['name']); ?></strong></td>
+                        <td><a href="mailto:<?php echo esc_attr($c['email']); ?>"><?php echo esc_html($c['email']); ?></a></td>
+                        <td>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('Rimuovere questa persona dalla rubrica?')">
+                                <?php wp_nonce_field('dcn_contact_remove_' . $c['id']); ?>
+                                <input type="hidden" name="action" value="dcn_contact_remove"><input type="hidden" name="cid" value="<?php echo esc_attr($c['id']); ?>">
+                                <button class="button button-link-delete">Rimuovi</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <?php echo self::signature(); // statica ?>
+        </div>
+        <?php
+    }
+
+    public static function handle_contact_add(): void
+    {
+        if (!current_user_can('edit_posts')) {
+            wp_die('Permesso negato.');
+        }
+        check_admin_referer('dcn_contact_add');
+        $name  = mb_substr(trim(sanitize_text_field(wp_unslash((string) ($_POST['name'] ?? '')))), 0, 80);
+        $email = sanitize_email(wp_unslash((string) ($_POST['email'] ?? '')));
+        $msg   = 'invalid';
+        if ($name !== '' && is_email($email)) {
+            $id   = substr(md5(strtolower($email)), 0, 10);
+            $list = array_values(array_filter(Plugin::contacts(), static fn ($c) => $c['id'] !== $id));
+            if (count($list) < 50) {
+                $list[] = ['id' => $id, 'name' => $name, 'email' => strtolower($email)];
+                update_option('dcn_contacts', $list, false);
+                $msg = 'added';
+            }
+        }
+        wp_safe_redirect(admin_url('admin.php?page=dcn-people&msg=' . $msg));
+        exit;
+    }
+
+    public static function handle_contact_remove(): void
+    {
+        $id = sanitize_key((string) ($_POST['cid'] ?? ''));
+        if (!current_user_can('edit_posts')) {
+            wp_die('Permesso negato.');
+        }
+        check_admin_referer('dcn_contact_remove_' . $id);
+        update_option('dcn_contacts', array_values(array_filter(Plugin::contacts(), static fn ($c) => $c['id'] !== $id)), false);
+        wp_safe_redirect(admin_url('admin.php?page=dcn-people&msg=removed'));
+        exit;
     }
 
     public static function settings_page(): void
