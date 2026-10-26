@@ -244,12 +244,13 @@
         const open = state.notes.filter((n) => n.status === 'open').length
         if (!cfg.ready || state.tab !== 'page' || (!open && !state.ready?.sent)) return null
         const r = state.ready || { sent: false }
-        const btn = h('button', { class: 'btn primary', type: 'button', disabled: !open, onclick: () => sendReady(btn) }, r.sent ? 'Invia di nuovo' : 'Segnala note pronte')
-        return h('div', { class: 'ready' },
-            h('div', { class: 'ready-txt' },
-                r.sent ? h('b', {}, `Avviso inviato a ${r.to}`) : h('b', {}, 'Hai finito con questa pagina?'),
-                r.sent ? h('span', {}, `${r.date} · ${r.count} not${r.count === 1 ? 'a' : 'e'}${r.fresh ? ` · ${r.fresh} nuov${r.fresh === 1 ? 'a' : 'e'} dopo l’invio` : ''}`) : h('span', {}, 'Avvisa il team che le note sono pronte da mettere in lavorazione.')),
-            btn)
+        const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+        const fresh = r.sent ? r.fresh : open
+        // se c'è qualcosa di nuovo da segnalare il pulsante è quello principale, altrimenti resta discreto
+        const btn = h('button', { class: `btn${!r.sent || fresh ? ' primary' : ''}`, type: 'button', disabled: !open, onclick: () => sendReady(btn) }, r.sent && !fresh ? 'Invia di nuovo' : 'Segnala note pronte')
+        const title = !r.sent ? 'Hai finito con questa pagina?' : fresh ? `${plural(fresh, 'nota nuova', 'note nuove')} da segnalare` : 'Avviso già inviato'
+        const sub = !r.sent ? 'Avvisa il team che le note sono pronte da mettere in lavorazione.' : `Ultimo avviso: ${r.date} a ${r.to} (${plural(r.count, 'nota', 'note')}).`
+        return h('div', { class: 'ready' }, h('div', { class: 'ready-txt' }, h('b', {}, title), h('span', {}, sub)), btn)
     }
     const sendReady = async (btn) => {
         const r = state.ready
