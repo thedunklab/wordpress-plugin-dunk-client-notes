@@ -77,7 +77,7 @@ class Admin
         register_setting('dcn', 'dcn_enabled', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_mail', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_emails', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
-        register_setting('dcn', 'dcn_notify_user', ['type' => 'integer', 'sanitize_callback' => 'absint']);
+        register_setting('dcn', 'dcn_notify_users', ['type' => 'array', 'sanitize_callback' => static fn ($v) => array_values(array_unique(array_filter(array_map('absint', (array) $v))))]);
         register_setting('dcn', 'dcn_smtp_host', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_smtp_port', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => (int) $v ?: 587]);
         register_setting('dcn', 'dcn_smtp_user', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
@@ -117,10 +117,14 @@ class Admin
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="dcn_notify_user">Avviso «Note pronte»</label></th>
+                        <th scope="row">Avviso «Note pronte»</th>
                         <td>
-                            <?php wp_dropdown_users(['name' => 'dcn_notify_user', 'id' => 'dcn_notify_user', 'selected' => (int) get_option('dcn_notify_user', 0), 'show_option_none' => '— Nessuno (pulsante nascosto) —', 'option_none_value' => 0, 'capability' => 'edit_posts']); ?>
-                            <p class="description">Quando il cliente preme «Segnala note pronte» nel pannello, questa persona riceve <strong>una sola email per pagina</strong> con l'elenco delle note aperte (non una per nota).</p>
+                            <?php
+                            $chosen = array_map(static fn ($u) => $u->ID, Plugin::ready_users());
+                            foreach (get_users(['capability' => 'edit_posts', 'orderby' => 'display_name', 'fields' => ['ID', 'display_name', 'user_email']]) as $u) : ?>
+                                <label style="display:block;margin:0 0 4px"><input type="checkbox" name="dcn_notify_users[]" value="<?php echo (int) $u->ID; ?>" <?php checked(in_array((int) $u->ID, $chosen, true)); ?>> <?php echo esc_html($u->display_name); ?> <span class="description">· <?php echo esc_html($u->user_email); ?></span></label>
+                            <?php endforeach; ?>
+                            <p class="description">Quando il cliente preme «Segnala note pronte» nel pannello, le persone selezionate ricevono <strong>una sola email per pagina</strong> con l'elenco delle note aperte (non una per nota). Se non ne scegli nessuna, il pulsante resta nascosto.</p>
                         </td>
                     </tr>
                     <tr>

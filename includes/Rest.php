@@ -190,8 +190,8 @@ class Rest
      */
     public static function ready_send(\WP_REST_Request $r)
     {
-        $user = Plugin::ready_user();
-        if (!$user) {
+        $users = Plugin::ready_users();
+        if (!$users) {
             return new \WP_Error('dcn_nouser', 'Il destinatario dell\'avviso non è configurato.', ['status' => 409]);
         }
         if ($e = self::throttle()) {
@@ -224,13 +224,13 @@ class Rest
         $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path)));
         $list  = admin_url('admin.php?page=dcn-notes&status=open&path=' . rawurlencode($path));
 
-        $body = "Ciao {$user->display_name},\n\n$author ha segnalato che le note della pagina $path sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ").\n\n"
+        $body = "Ciao,\n\n$author ha segnalato che le note della pagina $path sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ").\n\n"
             . implode("\n", $lines)
             . "\n\nApri la pagina con le note: $link\nElenco in bacheca: $list\n";
-        $sent = Mail::send($user->user_email, '[' . Plugin::label() . '] Note pronte: ' . $path . ' (' . $count . ')', [
+        $sent = Mail::send(wp_list_pluck($users, 'user_email'), '[' . Plugin::label() . '] Note pronte: ' . $path . ' (' . $count . ')', [
             'project' => Plugin::label(),
             'title'   => 'Note pronte: ' . $path,
-            'intro'   => "Ciao {$user->display_name},\n$author ha segnalato che le note di questa pagina sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ').',
+            'intro'   => "Ciao,\n$author ha segnalato che le note di questa pagina sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ').',
             'items'   => $items,
             'buttons' => [['label' => 'Apri la pagina con le note', 'url' => $link, 'primary' => true], ['label' => 'Elenco in bacheca', 'url' => $list]],
         ], $body);
@@ -238,7 +238,7 @@ class Rest
             return new \WP_Error('dcn_mail', 'Non è stato possibile inviare l\'email.', ['status' => 500]);
         }
 
-        $ready[$path] = ['at' => time(), 'by' => $author, 'to' => $user->display_name, 'ids' => $ids];
+        $ready[$path] = ['at' => time(), 'by' => $author, 'to' => implode(', ', wp_list_pluck($users, 'display_name')), 'ids' => $ids];
         update_option('dcn_ready', $ready, false);
 
         return new \WP_REST_Response(self::ready_info($path), 201);

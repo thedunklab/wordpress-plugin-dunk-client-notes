@@ -89,7 +89,7 @@ class Plugin
             'team'   => $team,
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
-            'ready'  => (bool) self::ready_user(),
+            'ready'  => (bool) self::ready_users(),
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');
@@ -170,13 +170,27 @@ class Plugin
         return wp_date('j M Y, H:i', strtotime($p->post_date_gmt . ' UTC') ?: null);
     }
 
-    /** Utente WordPress che riceve l'avviso «note pronte» (Impostazioni); null se non scelto o non più valido. */
-    public static function ready_user(): ?\WP_User
+    /**
+     * Utenti WordPress che ricevono l'avviso «note pronte» (Impostazioni); vuoto se nessuno è scelto.
+     * Legge anche la vecchia impostazione a utente singolo (`dcn_notify_user`).
+     *
+     * @return \WP_User[]
+     */
+    public static function ready_users(): array
     {
-        $id   = (int) get_option('dcn_notify_user', 0);
-        $user = $id ? get_userdata($id) : false;
+        $ids = (array) get_option('dcn_notify_users', []);
+        if (!$ids && ($old = (int) get_option('dcn_notify_user', 0))) {
+            $ids = [$old];
+        }
+        $users = [];
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            $u = $id ? get_userdata($id) : false;
+            if ($u && is_email($u->user_email)) {
+                $users[] = $u;
+            }
+        }
 
-        return $user && is_email($user->user_email) ? $user : null;
+        return $users;
     }
 
     /** Invia un'email al team (se attivo nelle impostazioni). */
