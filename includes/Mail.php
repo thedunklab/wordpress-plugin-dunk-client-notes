@@ -14,6 +14,7 @@ class Mail
     /** Testo alternativo e logo incorporato per la prossima email HTML. */
     private static string $alt = '';
     private static bool $logo = false;
+    private static string $image = '';
 
     public static function init(): void
     {
@@ -35,6 +36,9 @@ class Mail
         }
         if (self::$logo) {
             $mailer->addEmbeddedImage(DCN_DIR . 'assets/dunk-logo-mail.png', 'dunklogo', 'dunk-logo.png', 'base64', 'image/png');
+        }
+        if (self::$image !== '') {
+            $mailer->addEmbeddedImage(self::$image, 'nota', 'screenshot.jpg', 'base64', 'image/jpeg');
         }
         if (!self::ready()) {
             return;
@@ -66,11 +70,13 @@ class Mail
     /** Invia un'email HTML nello stile DUNK (testo semplice come alternativa). */
     public static function send($to, string $subject, array $spec, string $text): bool
     {
-        self::$alt  = $text;
-        self::$logo = true;
-        $ok         = wp_mail($to, $subject, self::render($spec, 'cid:dunklogo'), ['Content-Type: text/html; charset=UTF-8']);
-        self::$alt  = '';
-        self::$logo = false;
+        self::$alt   = $text;
+        self::$logo  = true;
+        self::$image = !empty($spec['image']) && is_file($spec['image']) ? (string) $spec['image'] : '';
+        $ok          = wp_mail($to, $subject, self::render($spec + ['image_src' => self::$image !== '' ? 'cid:nota' : ''], 'cid:dunklogo'), ['Content-Type: text/html; charset=UTF-8']);
+        self::$alt   = '';
+        self::$logo  = false;
+        self::$image = '';
 
         return $ok;
     }
@@ -106,6 +112,7 @@ class Mail
             . '<h1 style="margin:0 0 14px;font-size:24px;line-height:1.2;font-weight:700">' . $e($spec['title'] ?? '') . '</h1>'
             . '<p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#d9d9d4">' . nl2br($e($spec['intro'] ?? '')) . '</p>'
             . ($items !== '' ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">' . $items . '</table>' : '')
+            . (!empty($spec['image_src']) ? '<p style="margin:0 0 20px"><img src="' . esc_attr($spec['image_src']) . '" width="544" alt="Screenshot" style="display:block;width:100%;max-width:544px;height:auto;border:1px solid #333333;border-radius:10px"></p>' : '')
             . '<div style="margin:0 0 8px">' . $buttons . '</div>'
             . '</td></tr>'
             . '<tr><td style="padding:16px 28px;border-top:1px solid #333333;background:#121212;font-family:' . $font . ';font-size:12px;color:#a8a8a3">' . $e($spec['footer'] ?? 'DUNK Client Notes · by DUNK') . '</td></tr>'

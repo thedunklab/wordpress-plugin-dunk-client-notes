@@ -10,7 +10,7 @@
 
     const normPath = (p) => (p.endsWith('/') ? p : p + '/')
     const path = normPath(location.pathname)
-    const state = { notes: [], all: null, tab: 'page', view: 'list', ready: null, current: 0, resolved: false, picking: false, composer: null }
+    const state = { notes: [], all: null, tab: 'page', view: 'list', ready: null, contacts: [], current: 0, resolved: false, picking: false, composer: null }
 
     /* ---------- utilità ---------- */
     const h = (tag, attrs = {}, ...kids) => {
@@ -117,6 +117,7 @@
         try {
             state.all = await api('/notes')
             state.notes = state.all.filter((n) => n.path === path)
+            state.contacts = await api('/contacts')
             if (cfg.ready) state.ready = await api('/ready?path=' + encodeURIComponent(path))
         } catch (e) { toast(e.message) }
         render()
@@ -165,16 +166,53 @@
         if (panel.hidden) return
         const head = h('div', { class: 'head' },
             state.view === 'note' ? h('button', { class: 'icon', type: 'button', 'aria-label': 'Indietro', onclick: () => { state.view = 'list'; renderPins(); renderPanel() } }, '←') : null,
-            h('h2', {}, state.view === 'note' ? 'Nota' : `Note · ${cfg.label}`),
+            h('h2', {}, state.view === 'note' ? 'Nota' : state.view === 'contacts' ? 'Persone esterne' : `Note · ${cfg.label}`),
             h('button', { class: 'icon', type: 'button', 'aria-label': 'Chiudi', onclick: () => { panel.hidden = true } }, '✕')
         )
         const body = h('div', { class: 'body' })
         panel.replaceChildren(...[head, state.view === 'note' ? null : toolbar(), body, byDunk()].filter(Boolean))
-        state.view === 'note' ? renderNote(body) : renderList(body)
+        state.view === 'note' ? renderNote(body) : state.view === 'contacts' ? renderContacts(body) : renderList(body)
     }
 
     const LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700.9 334.8" fill="currentColor" aria-hidden="true"><path d="M140.5,19.1C129,6.4,111.7,0,88.8,0H0v235l64.8-8.8V56.2h7.1c6.2,0,10.9.6,13.9,1.9,3,1.2,5.1,3.7,6.2,7.3,1.1,3.6,1.7,9.1,1.7,16.3v140.6l65.1-8.8-.7-137.8c-.2-25-6.1-43.8-17.6-56.6h0Z"></path> <path d="M102.4,257.6c0,11.5-5.9,17.2-17.6,17.2h-11.2v-38.6l-64.8,8.8v86.8h86.5c26,0,44.6-8,55.8-24s16.7-39.8,16.5-71.5v-12.8c0,0-65.2,8.8-65.2,8.8v25.3h0Z"></path> <polygon points="236 0 173.4 0 173.4 211.5 236 203 236 0"></polygon> <polygon points="267.4 0 267.4 198.8 330 190.3 330 0 267.4 0"></polygon> <path d="M276.2,243c0,10.5-1,18.5-3,24.2s-6.2,8.4-12.7,8.4-10.7-2.9-12.7-8.6c-2-5.7-3-13.7-3-24v-30l-62.6,8.5v24.1c0,29.5,6.4,51.7,19.3,66.7,12.9,15,32.5,22.5,59,22.5s46.1-7.5,59-22.5,19.3-37.2,19.3-66.7v-45.3l-62.5,8.5v34.2h0Z"></path> <polygon points="451.1 331.8 514 331.8 514 176.5 422.5 188.9 451.1 331.8"></polygon> <polygon points="356 331.8 418.9 331.8 418.9 189.4 356 197.9 356 331.8"></polygon> <polygon points="443.1 0 443.1 153.9 413.5 0 347.2 0 347.2 187.9 410.1 179.4 410.1 160.7 413.8 178.9 505.3 166.5 505.3 0 443.1 0"></polygon> <polygon points="657.5 157.1 535 173.7 535 331.8 599 331.8 599 175.9 634.3 331.8 700.9 331.8 657.5 157.2 657.5 157.1"></polygon> <polygon points="684.7 0 619.9 0 589.9 128.9 589.9 0 526.3 0 526.3 163.7 648.8 147.1 684.7 0"></polygon></svg>'
     const byDunk = () => h('div', { class: 'by-dunk' }, h('a', { class: 'logo', href: 'https://thedunk.it', target: '_blank', rel: 'noopener', 'aria-label': 'DUNK' }, document.createRange().createContextualFragment(LOGO)))
+
+    const USER_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg>'
+
+    /* persone esterne: si aggiungono qui (nome + email) e si richiamano per segnalare una nota o una risposta */
+    const renderContacts = (body) => {
+        const name = h('input', { type: 'text', placeholder: 'Nome e cognome', maxlength: 80, required: true, 'aria-label': 'Nome e cognome' })
+        const email = h('input', { type: 'email', placeholder: 'Email', maxlength: 120, required: true, 'aria-label': 'Email' })
+        const add = h('button', { class: 'btn primary add', type: 'submit', title: 'Aggiungi', 'aria-label': 'Aggiungi' }, '+')
+        body.append(
+            h('p', { class: 'hint-txt' }, 'Aggiungi chi vuoi coinvolgere fuori dal team: scrivendo una nota o una risposta potrai segnalarla a queste persone, che la riceveranno via email.'),
+            h('form', { class: 'form contact-form', onsubmit: async (e) => {
+                e.preventDefault()
+                add.disabled = true
+                try { state.contacts = await api('/contacts', { method: 'POST', body: { name: name.value, email: email.value } }); toast('Persona aggiunta.'); renderPanel() } catch (err) { toast(err.message); add.disabled = false }
+            } }, name, h('div', { class: 'row' }, email, add))
+        )
+        if (!state.contacts.length) { body.append(h('div', { class: 'empty' }, 'Nessuna persona aggiunta.')); return }
+        state.contacts.forEach((c) => body.append(h('div', { class: 'contact' },
+            h('span', { class: 'avatar' }, c.name.trim().charAt(0).toUpperCase()),
+            h('span', { class: 'contact-info' }, h('b', {}, c.name), h('span', { class: 'meta' }, c.email)),
+            h('button', { class: 'icon', type: 'button', title: 'Rimuovi', 'aria-label': 'Rimuovi ' + c.name, onclick: async () => {
+                try { state.contacts = await api('/contacts/' + c.id, { method: 'DELETE' }); renderPanel() } catch (err) { toast(err.message) }
+            } }, '✕')
+        )))
+    }
+
+    /* scelta delle persone esterne da segnalare (nel modulo di nota e in quello di risposta) */
+    const tagPicker = () => {
+        const chosen = new Set()
+        if (!state.contacts.length) return { el: null, value: () => [] }
+        const el = h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, 'Segnala a'),
+            ...state.contacts.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': 'false', title: c.email, onclick: (e) => {
+                chosen.has(c.id) ? chosen.delete(c.id) : chosen.add(c.id)
+                e.currentTarget.setAttribute('aria-pressed', String(chosen.has(c.id)))
+            } }, c.name)))
+        return { el, value: () => [...chosen] }
+    }
 
     const toolbar = () => {
         const src = state.tab === 'all' ? (state.all || []) : state.notes
@@ -183,9 +221,14 @@
         return h('div', { class: 'tools' },
             h('div', { class: 'tools-row' },
                 h('button', { class: 'btn primary', type: 'button', onclick: startPick }, '+ Nuova nota'),
-                h('div', { class: 'tabs', role: 'tablist' },
-                    h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page'), onclick: () => { state.tab = 'page'; renderPanel() } }, 'Pagina'),
-                    h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all'), onclick: () => { state.tab = 'all'; renderPanel() } }, 'Tutte')
+                h('div', { class: 'tools-right' },
+                    h('div', { class: 'tabs', role: 'tablist' },
+                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page' && state.view !== 'contacts'), onclick: () => { state.tab = 'page'; state.view = 'list'; renderPanel() } }, 'Pagina'),
+                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all' && state.view !== 'contacts'), onclick: () => { state.tab = 'all'; state.view = 'list'; renderPanel() } }, 'Tutte')
+                    ),
+                    h('button', { class: `icon-btn${state.view === 'contacts' ? ' on' : ''}`, type: 'button', title: 'Persone esterne da segnalare', 'aria-label': 'Persone esterne da segnalare', 'aria-pressed': String(state.view === 'contacts'),
+                        onclick: () => { state.view = state.view === 'contacts' ? 'list' : 'contacts'; renderPanel() } },
+                        document.createRange().createContextualFragment(USER_PLUS))
                 )
             ),
             h('div', { class: 'tools-row sub' },
@@ -265,6 +308,7 @@
                     h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null),
                     h('div', { class: 'by-meta' }, n.date, statusBadge(n.status)))),
             h('p', {}, n.text),
+            n.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + n.tagged.join(', ')) : null,
             n.shot ? h('a', { class: 'shot', href: n.shot, target: '_blank', rel: 'noopener' }, h('img', { src: n.shot, alt: 'Screenshot della pagina al momento della nota', loading: 'lazy' })) : null
         ))
         if (cfg.team) {
@@ -274,19 +318,20 @@
                 } }, label))
             ), h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
         }
-        n.replies.forEach((r) => body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', h('span', { class: 'meta' }, ' · ' + r.date), h('p', {}, r.text))))
+        n.replies.forEach((r) => body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', h('span', { class: 'meta' }, ' · ' + r.date), h('p', {}, r.text), r.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + r.tagged.join(', ')) : null)))
         const name = h('input', { type: 'text', placeholder: 'Il tuo nome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, 'aria-label': 'Il tuo nome' })
         const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, required: true, 'aria-label': 'Risposta' })
         const send = h('button', { class: 'btn primary', type: 'submit' }, 'Rispondi')
+        const tags = tagPicker()
         body.append(h('form', { class: 'form', onsubmit: async (e) => {
             e.preventDefault()
             send.disabled = true
             try {
                 if (!cfg.team) saveName(name.value.trim())
-                await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, author: name.value } })
+                await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, author: name.value, tag: tags.value() } })
                 await load()
             } catch (err) { toast(err.message); send.disabled = false }
-        } }, name, text, send))
+        } }, name, text, tags.el, send))
     }
 
     /* ---------- nuova nota: scelta dell'elemento ---------- */
@@ -374,6 +419,7 @@
         const text = h('textarea', { placeholder: 'Cosa vuoi segnalare o modificare?', maxlength: 2000, required: true, 'aria-label': 'Nota' })
         const shot = h('input', { type: 'checkbox', checked: true })
         const send = h('button', { class: 'btn primary', type: 'submit' }, 'Invia nota')
+        const tags = tagPicker()
         const form = h('form', { class: 'composer', onsubmit: async (e) => {
             e.preventDefault()
             send.disabled = true; send.textContent = 'Invio…'
@@ -387,7 +433,7 @@
                 }
                 const note = await api('/notes', { method: 'POST', body: {
                     path, url: location.href.split('#')[0], selector: pick.selector, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
-                    vw: innerWidth, text: text.value, author: name.value, screenshot,
+                    vw: innerWidth, text: text.value, author: name.value, screenshot, tag: tags.value(),
                 } })
                 closeComposer()
                 toast('Nota inviata. Grazie!')
@@ -395,7 +441,7 @@
                 openNote(note.id)
             } catch (err) { form.hidden = false; toast(err.message); send.disabled = false; send.textContent = 'Invia nota' }
         } },
-            h('h3', {}, 'Nuova nota'), name, text,
+            h('h3', {}, 'Nuova nota'), name, text, tags.el,
             h('label', { class: 'check' }, shot, 'Allega uno screenshot della pagina'),
             h('div', { class: 'row' }, send, h('button', { class: 'btn', type: 'button', onclick: closeComposer }, 'Annulla'))
         )

@@ -109,6 +109,16 @@ class Plugin
         ]);
     }
 
+    /**
+     * Persone esterne al team aggiunte dal pannello (nome ed email), da segnalare su note e risposte.
+     *
+     * @return array<int, array{id: string, name: string, email: string}>
+     */
+    public static function contacts(): array
+    {
+        return array_values(array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email'])));
+    }
+
     /** Numero di note con lo stato indicato ('' = tutte). */
     public static function count(string $status = ''): int
     {
@@ -141,6 +151,7 @@ class Plugin
                 'source' => (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client',
                 'text'   => $r->post_content,
                 'date'   => self::human_date($r),
+                'tagged' => array_values((array) get_post_meta($r->ID, '_dcn_tagged', true)),
             ];
         }
 
@@ -161,6 +172,7 @@ class Plugin
             'vw'       => (int) $meta('vw'),
             'shot'     => $shot !== '' ? trailingslashit($up['baseurl']) . $shot : '',
             'date'     => self::human_date($note),
+            'tagged'   => array_values((array) $meta('tagged')),
             'replies'  => $reply,
         ];
     }

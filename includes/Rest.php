@@ -26,6 +26,13 @@ class Rest
         register_rest_route(self::NS, '/notes/(?P<id>\d+)/replies', [
             ['methods' => 'POST', 'callback' => [self::class, 'reply'], 'permission_callback' => [self::class, 'can_use']],
         ]);
+        register_rest_route(self::NS, '/contacts', [
+            ['methods' => 'GET', 'callback' => [self::class, 'contacts_list'], 'permission_callback' => [self::class, 'can_use']],
+            ['methods' => 'POST', 'callback' => [self::class, 'contacts_add'], 'permission_callback' => [self::class, 'can_use']],
+        ]);
+        register_rest_route(self::NS, '/contacts/(?P<cid>[a-f0-9]{10})', [
+            ['methods' => 'DELETE', 'callback' => [self::class, 'contacts_remove'], 'permission_callback' => [self::class, 'can_use']],
+        ]);
         register_rest_route(self::NS, '/ready', [
             ['methods' => 'GET', 'callback' => [self::class, 'ready_state'], 'permission_callback' => [self::class, 'can_use']],
             ['methods' => 'POST', 'callback' => [self::class, 'ready_send'], 'permission_callback' => [self::class, 'can_use']],
@@ -128,6 +135,8 @@ class Rest
             'buttons' => [['label' => 'Apri la nota', 'url' => $link, 'primary' => true], ['label' => 'Gestisci in bacheca', 'url' => admin_url('admin.php?page=dcn-notes&note=' . $id)]],
         ]);
 
+        self::tag($r, get_post($id), $id, $author, $text, false);
+
         return new \WP_REST_Response(Plugin::format(get_post($id)), 201);
     }
 
@@ -153,6 +162,8 @@ class Rest
         update_post_meta($id, '_dcn_author', $author);
         update_post_meta($id, '_dcn_source', self::is_team() ? 'team' : 'client');
 
+        self::tag($r, $note, $id, $author, $text, true);
+
         if (!self::is_team()) {
             $n = (int) get_post_meta($note->ID, '_dcn_n', true);
             Plugin::notify('Risposta alla nota #' . $n, "$author ha risposto:\n\n$text\n\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $note->ID), [
@@ -176,6 +187,86 @@ class Rest
         update_post_meta($note->ID, '_dcn_status', $status);
 
         return new \WP_REST_Response(Plugin::format($note));
+    }
+
+    /* ---- persone esterne da segnalare ---- */
+
+    public static function contacts_list(): \WP_REST_Response
+    {
+        return new \WP_REST_Response(Plugin::contacts());
+    }
+
+    public static function contacts_add(\WP_REST_Request $r)
+    {
+        if ($e = self::throttle()) {
+            return $e;
+        }
+        $name  = mb_substr(trim(sanitize_text_field(wp_unslash((string) $r->get_param('name')))), 0, 80);
+        $email = sanitize_email((string) $r->get_param('email'));
+        if ($name === '' || !is_email($email)) {
+            return new \WP_Error('dcn_contact', 'Inserisci nome e cognome e un indirizzo email valido.', ['status' => 400]);
+        }
+        $list = Plugin::contacts();
+        $id   = substr(md5(strtolower($email)), 0, 10);
+        $list = array_values(array_filter($list, static fn ($c) => $c['id'] !== $id));
+        if (count($list) >= 50) {
+            return new \WP_Error('dcn_contact_max', 'Hai raggiunto il numero massimo di persone (50).', ['status' => 400]);
+        }
+        $list[] = ['id' => $id, 'name' => $name, 'email' => strtolower($email)];
+        update_option('dcn_contacts', $list, false);
+
+        return new \WP_REST_Response($list, 201);
+    }
+
+    public static function contacts_remove(\WP_REST_Request $r): \WP_REST_Response
+    {
+        $list = array_values(array_filter(Plugin::contacts(), static fn ($c) => $c['id'] !== (string) $r['cid']));
+        update_option('dcn_contacts', $list, false);
+
+        return new \WP_REST_Response($list);
+    }
+
+    /**
+     * Segnala una nota o una risposta alle persone esterne scelte (`tag` = id dei contatti, max 5): una email a testa.
+     * Salva i nomi sulla nota/risposta e li restituisce.
+     */
+    private static function tag(\WP_REST_Request $r, \WP_Post $note, int $post_id, string $author, string $text, bool $is_reply): void
+    {
+        $ids = array_slice(array_filter(array_map('sanitize_key', (array) $r->get_param('tag'))), 0, 5);
+        if (!$ids) {
+            return;
+        }
+        $by = [];
+        foreach (Plugin::contacts() as $c) {
+            $by[$c['id']] = $c;
+        }
+        $n     = (int) get_post_meta($note->ID, '_dcn_n', true);
+        $path  = (string) get_post_meta($note->ID, '_dcn_path', true);
+        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $note->ID;
+        $shot  = (string) get_post_meta($note->ID, '_dcn_shot', true);
+        $image = $shot !== '' ? trailingslashit(wp_get_upload_dir()['basedir']) . $shot : '';
+        $names = [];
+        foreach ($ids as $id) {
+            if (!isset($by[$id])) {
+                continue;
+            }
+            $c       = $by[$id];
+            $names[] = $c['name'];
+            $title   = $is_reply ? "Una risposta alla nota #$n" : "Una nota per te: #$n";
+            $intro   = "Ciao {$c['name']},\n$author ti ha segnalato " . ($is_reply ? "una risposta alla nota #$n" : "la nota #$n") . " sulla pagina $path.";
+            Mail::send($c['email'], '[' . Plugin::label() . '] ' . $title, [
+                'project' => Plugin::label(),
+                'title'   => $title,
+                'intro'   => $intro,
+                'items'   => [['n' => $n, 'author' => $author, 'text' => $text]],
+                'image'   => $is_reply ? '' : $image,
+                'buttons' => [['label' => 'Apri la pagina nel punto della nota', 'url' => $link, 'primary' => true]],
+                'footer'  => 'Per aprire la pagina serve la password di accesso allo staging: chiedila a chi ti ha scritto. · DUNK Client Notes',
+            ], "$intro\n\n$text\n\nApri la pagina: $link\n");
+        }
+        if ($names) {
+            update_post_meta($post_id, '_dcn_tagged', $names);
+        }
     }
 
     /** GET /ready?path=/pagina/ → ultimo avviso «note pronte» inviato per quella pagina (se c'è). */

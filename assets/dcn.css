@@ -122,3 +122,22 @@
 .ready { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 12px; border: 1px solid rgba(253, 224, 0, .45); border-radius: 12px; background: rgba(253, 224, 0, .07); }
 .ready-txt { display: flex; flex-direction: column; min-width: 0; font-size: 12px; color: var(--muted); }
 .ready-txt b { color: var(--text); font-size: 13px; }
+
+/* persone esterne */
+.tools-right { display: flex; align-items: center; gap: 10px; }
+.icon-btn { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--bg2); color: var(--muted); }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn:hover { background: var(--bg3); color: var(--text); }
+.icon-btn.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.hint-txt { margin: 6px 4px 4px; color: var(--muted); font-size: 13px; }
+.contact-form .row input { flex: 1; min-width: 0; }
+.btn.add { flex: none !important; width: 40px; padding: 0; font-size: 22px; font-weight: 500; }
+.contact { display: flex; align-items: center; gap: 10px; margin: 4px 0; padding: 8px 6px 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); }
+.avatar { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.contact-info { display: flex; flex-direction: column; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tag { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tag-label { color: var(--muted); font-size: 12px; font-weight: 600; }
+.chip { height: 26px; padding: 0 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg2); color: var(--text); font-size: 12px; font-weight: 600; }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed='true'] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.tagged { margin: -4px 0 8px !important; color: var(--muted); font-size: 12px !important; }

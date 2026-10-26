@@ -11,6 +11,7 @@ Note e commenti del cliente direttamente sulle pagine dello **staging**, senza s
 - **Bacheca → Note cliente**: elenco con filtri per stato e pagina, scheda della nota con screenshot, risposte, cambio stato, eliminazione, link "Apri la pagina nel punto della nota". Email al team a ogni nuova nota o risposta del cliente.
 - **Avviso «Note pronte»** (per pagina, non per nota): nel pannello, tab «Pagina», il pulsante **Segnala note pronte** manda *una* email alle persone scelte in **Impostazioni → Avviso «Note pronte»** (uno o più utenti WordPress), con l'elenco delle note aperte e i link. Dopo l'invio il pannello mostra «Avviso inviato a … · data · N note»; si può rinviare (con conferma se non ci sono nuove note), le nuove sono marcate «(nuova)» nell'email. Stessa pagina: almeno 2 minuti tra due invii. Senza destinatario scelto il pulsante non compare.
 - **Invio email via SMTP** (Impostazioni → Invio email): host, porta, utente, password e mittente (es. MailerSend); con il pulsante «Invia email di prova». Serve sullo staging, dove la posta locale non è autenticata. Vale per tutte le email del sito.
+- **Persone esterne**: l'icona accanto a «Pagina / Tutte» apre la rubrica (nome e cognome + email, con «+»; si rimuovono con ✕). Scrivendo una nota o una risposta si possono scegliere (chip «Segnala a», max 5): ognuno riceve una email con il testo, lo screenshot (solo per le note) e il link. Il link richiede la password dello staging, da comunicare a parte.
 
 ## Uso
 1. Copia la cartella in `wp-content/plugins/` e attiva il plugin.
