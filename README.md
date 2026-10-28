@@ -4,6 +4,27 @@ _by DUNK_ · font **DM Sans** (file incluso in `assets/fonts/`, licenza OFL: nes
 
 Note e commenti del cliente direttamente sulle pagine dello **staging**, senza strumenti esterni né account.
 
+## Installazione in un progetto
+Il plugin vive in questa repo; nei progetti entra come **sottomodulo git** nella cartella dei plugin, così ogni progetto fissa la versione che usa.
+
+```bash
+git submodule add git@github.com:thedunklab/wordpress-plugin-dunk-client-notes.git wp-content/plugins/dunk-client-notes
+git commit -m "Aggiunge dunk-client-notes"
+```
+
+Dopo il clone di un progetto: `git submodule update --init`. Per passare a una nuova versione:
+
+```bash
+cd wp-content/plugins/dunk-client-notes && git fetch --tags && git checkout v1.1.0
+cd - && git add wp-content/plugins/dunk-client-notes && git commit -m "Aggiorna dunk-client-notes a v1.1.0"
+```
+
+Poi attiva il plugin e, solo sullo **staging**, accendilo in Note cliente → Impostazioni. Ogni sito ha le sue impostazioni (nome progetto, destinatari, SMTP, persone esterne).
+
+## Sviluppo e versioni
+- Si modifica **qui** (o dal sottomodulo di un progetto, poi commit e push nella sua cartella), mai copiando file a mano tra progetti.
+- Versioni semver: aggiorna `Version` nell'header di `dunk-client-notes.php` e `DCN_VERSION`, annota in `CHANGELOG.md`, poi `git tag vX.Y.Z && git push --tags`.
+
 ## Cosa fa
 - Il cliente clicca **Note → Nuova nota**, sceglie l'elemento della pagina, scrive e invia. Si salvano: pagina, elemento (selettore CSS e punto cliccato), larghezza dello schermo, nome e testo.
 - **Screenshot automatico** (opzionale, attivo di default) della parte visibile della pagina, con un cerchio rosso sul punto scelto. Usa `html2canvas-pro` (incluso, MIT) e si salva in `uploads/dunk-notes/`.
