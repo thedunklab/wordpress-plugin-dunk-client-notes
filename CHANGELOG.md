@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.1 — 2026-10-28
+- Fix: nella pagina «Novità» il registro delle versioni mostrava la risposta grezza di GitHub invece del testo.
+
 ## 1.5.0 — 2026-10-28
 - Nuova impostazione «Posizione del pulsante»: lato (destra o sinistra) e distanza dal bordo basso, per non sovrapporsi ad altri widget fissi (Iubenda, chat).
 - Il pannello delle note segue la posizione del pulsante.

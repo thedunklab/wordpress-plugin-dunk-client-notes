@@ -81,6 +81,10 @@ final class Updater
             $info['version'] = $best['version'];
             $info['zip'] = $best['zip'];
             [$c, $md] = self::get('/repos/' . self::REPO . '/contents/CHANGELOG.md?ref=' . rawurlencode($best['tag']), 'application/vnd.github.raw');
+            if ($c === 200 && str_starts_with(ltrim($md), '{')) { // risposta JSON invece del testo: si decodifica il contenuto
+                $j = json_decode($md, true);
+                $md = is_array($j) && ($j['encoding'] ?? '') === 'base64' ? (string) base64_decode((string) $j['content']) : '';
+            }
             $info['changelog'] = $c === 200 ? $md : '';
         } else {
             $info['error'] = 'Nessuna versione (tag vX.Y.Z) trovata nella repo.';
@@ -148,7 +152,7 @@ final class Updater
     /** Il download dalla repo privata richiede il token. */
     public static function auth(array $args, string $url): array
     {
-        if (self::token() !== '' && str_starts_with($url, 'https://api.github.com/repos/' . self::REPO . '/')) {
+        if (self::token() !== '' && str_starts_with($url, 'https://api.github.com/repos/' . self::REPO . '/zipball/')) {
             $args['headers']['Authorization'] = 'Bearer ' . self::token();
             $args['headers']['Accept'] = 'application/vnd.github+json';
         }
