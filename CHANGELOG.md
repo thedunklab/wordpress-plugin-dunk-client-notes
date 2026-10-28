@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 — 2026-10-28
+Aggiornamenti da sito a sito e registro delle novità.
+- Il plugin si aggiorna dalla bacheca di WordPress (Plugin → «Aggiorna ora», anche automatico) leggendo l'ultimo tag `vX.Y.Z` della repo GitHub: niente più deploy per ogni nuova versione.
+- Nuova voce **Note cliente → Novità**: versione installata e disponibile, «Controlla ora», registro delle versioni.
+- Il registro compare anche nella scheda «Visualizza dettagli» del plugin (tab Changelog).
+- Nuovo campo **Impostazioni → Aggiornamenti** per il token GitHub in sola lettura (oppure costante `DUNK_NOTES_GITHUB_TOKEN` in wp-config.php).
+- Nei checkout git (sottomoduli di sviluppo) gli aggiornamenti da bacheca restano spenti.
+
 ## 1.3.0 — 2026-10-28
 - Nuova impostazione «Dopo l'invio»: il pannello si chiude dopo l'invio di una risposta, così si può scegliere subito un'altra nota (attiva di default).
 

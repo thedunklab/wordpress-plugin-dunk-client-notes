@@ -20,6 +20,7 @@ class Admin
         add_action('admin_post_dcn_testmail', [self::class, 'handle_testmail']);
         add_action('admin_post_dcn_contact_add', [self::class, 'handle_contact_add']);
         add_action('admin_post_dcn_contact_remove', [self::class, 'handle_contact_remove']);
+        add_action('admin_post_dcn_checkupdate', [self::class, 'handle_checkupdate']);
         add_action('admin_post_dcn_delete', [self::class, 'handle_delete']);
         add_action('admin_notices', [self::class, 'notice']);
         add_action('admin_head', [self::class, 'font']);
@@ -46,6 +47,7 @@ class Admin
         add_menu_page('Note del cliente', 'Note cliente', 'edit_posts', 'dcn-notes', [self::class, 'page'], 'dashicons-format-chat', 26);
         add_submenu_page('dcn-notes', 'Note del cliente', 'Tutte le note', 'edit_posts', 'dcn-notes', [self::class, 'page']);
         add_submenu_page('dcn-notes', 'Persone esterne', 'Persone esterne', 'edit_posts', 'dcn-people', [self::class, 'people_page']);
+        add_submenu_page('dcn-notes', 'Novità e aggiornamenti', 'Novità', 'manage_options', 'dcn-updates', [self::class, 'updates_page']);
         add_submenu_page('dcn-notes', 'Impostazioni note', 'Impostazioni', 'manage_options', 'dcn-settings', [self::class, 'settings_page']);
     }
 
@@ -89,6 +91,7 @@ class Admin
         register_setting('dcn', 'dcn_smtp_from', ['type' => 'string', 'sanitize_callback' => 'sanitize_email']);
         register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_autoclose', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
+        register_setting('dcn', 'dcn_github_token', ['type' => 'string', 'sanitize_callback' => static fn ($v) => trim((string) $v) !== '' ? trim((string) $v) : (string) get_option('dcn_github_token', '')]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     }
 
@@ -231,6 +234,17 @@ class Admin
                             <p class="description"><?php echo Mail::ready() ? '<strong>SMTP attivo.</strong>' : 'SMTP non attivo (servono host, utente e password).'; ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row">Aggiornamenti</th>
+                        <td>
+                            <?php if (defined('DUNK_NOTES_GITHUB_TOKEN')) : ?>
+                                <p class="description" style="margin-top:0">Token impostato da <code>DUNK_NOTES_GITHUB_TOKEN</code> in wp-config.php.</p>
+                            <?php else : ?>
+                                <p><input type="password" name="dcn_github_token" class="regular-text" placeholder="<?php echo get_option('dcn_github_token') ? '•••••••• (salvato: lascia vuoto per non cambiarlo)' : 'Token GitHub (sola lettura)'; ?>" autocomplete="new-password"></p>
+                                <p class="description">Serve per aggiornare il plugin da questa bacheca (Note cliente → Novità). È un token GitHub con accesso in <strong>sola lettura</strong> alla repo del plugin, uguale per tutti i siti.</p>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                 </table>
                 <?php submit_button(); ?>
             </form>
@@ -241,6 +255,64 @@ class Admin
                     <button class="button">Invia email di prova a <?php echo esc_html($me->user_email); ?></button>
                 </form>
             <?php endif; ?>
+            <?php echo self::signature(); // statica ?>
+        </div>
+        <?php
+    }
+
+    public static function handle_checkupdate(): void
+    {
+        check_admin_referer('dcn_checkupdate');
+        if (!current_user_can('manage_options')) {
+            wp_die('Non autorizzato.', 403);
+        }
+        Updater::refresh();
+        wp_safe_redirect(admin_url('admin.php?page=dcn-updates'));
+        exit;
+    }
+
+    public static function updates_page(): void
+    {
+        $info = Updater::latest();
+        $newer = Updater::newer($info);
+        $base = plugin_basename(DCN_FILE);
+        $md = $info['changelog'] !== '' ? $info['changelog'] : (string) @file_get_contents(DCN_DIR . 'CHANGELOG.md');
+        ?>
+        <div class="wrap dcn-wrap">
+            <h1>Note cliente · Novità</h1>
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row">Versione installata</th>
+                    <td><strong><?php echo esc_html(DCN_VERSION); ?></strong></td>
+                </tr>
+                <tr>
+                    <th scope="row">Ultima versione</th>
+                    <td>
+                        <?php if ($info['error'] !== '') : ?>
+                            <span style="color:#b32d2e"><?php echo esc_html($info['error']); ?></span>
+                        <?php elseif ($newer) : ?>
+                            <strong><?php echo esc_html($info['version']); ?></strong> · disponibile
+                            <?php if (!Updater::dev() && current_user_can('update_plugins')) : ?>
+                                — <a class="button button-primary" href="<?php echo esc_url(wp_nonce_url(self_admin_url('update.php?action=upgrade-plugin&plugin=' . rawurlencode($base)), 'upgrade-plugin_' . $base)); ?>">Aggiorna ora</a>
+                            <?php endif; ?>
+                        <?php else : ?>
+                            <?php echo esc_html($info['version']); ?> · il plugin è aggiornato
+                        <?php endif; ?>
+                        <?php if ($info['checked']) : ?><p class="description">Ultimo controllo: <?php echo esc_html(wp_date('j M Y, H:i', $info['checked'])); ?>. WordPress ricontrolla da solo ogni 12 ore.</p><?php endif; ?>
+                        <?php if (Updater::dev()) : ?><p class="description">Qui il plugin è un checkout git (sviluppo): si aggiorna con git, non da bacheca.</p><?php endif; ?>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:8px">
+                            <?php wp_nonce_field('dcn_checkupdate'); ?>
+                            <input type="hidden" name="action" value="dcn_checkupdate">
+                            <button class="button">Controlla ora</button>
+                        </form>
+                        <p class="description">Per averlo in automatico: Plugin → «Attiva aggiornamenti automatici» accanto a DUNK Client Notes.</p>
+                    </td>
+                </tr>
+            </table>
+            <h2>Registro delle versioni</h2>
+            <div class="dcn-changelog" style="max-width:760px;background:#fff;border:1px solid #dcdcde;padding:4px 20px 12px">
+                <?php echo wp_kses_post(Updater::markdown($md)); ?>
+            </div>
             <?php echo self::signature(); // statica ?>
         </div>
         <?php
