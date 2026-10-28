@@ -81,10 +81,6 @@ final class Updater
             $info['version'] = $best['version'];
             $info['zip'] = $best['zip'];
             [$c, $md] = self::get('/repos/' . self::REPO . '/contents/CHANGELOG.md?ref=' . rawurlencode($best['tag']), 'application/vnd.github.raw');
-            if ($c === 200 && str_starts_with(ltrim($md), '{')) { // risposta JSON invece del testo: si decodifica il contenuto
-                $j = json_decode($md, true);
-                $md = is_array($j) && ($j['encoding'] ?? '') === 'base64' ? (string) base64_decode((string) $j['content']) : '';
-            }
             $info['changelog'] = $c === 200 ? $md : '';
         } else {
             $info['error'] = 'Nessuna versione (tag vX.Y.Z) trovata nella repo.';
@@ -133,7 +129,7 @@ final class Updater
             return $res;
         }
         $info = self::latest();
-        $md = self::newer($info) && $info['changelog'] !== '' ? $info['changelog'] : (string) @file_get_contents(DCN_DIR . 'CHANGELOG.md');
+        $md = self::changelog($info);
         return (object) [
             'name' => 'DUNK Client Notes',
             'slug' => dirname(plugin_basename(DCN_FILE)),
@@ -174,6 +170,21 @@ final class Updater
         return $wp_filesystem->move($source, $dest, true) ? $dest : new \WP_Error('dcn_rename', 'Impossibile rinominare la cartella del plugin aggiornato.');
     }
 
+    /**
+     * Testo del registro da mostrare: quello del plugin installato se è aggiornato, altrimenti quello della nuova versione.
+     * Se GitHub (o una cache vecchia) ha restituito il JSON del file invece del testo, si decodifica il contenuto.
+     */
+    public static function changelog(?array $info = null): string
+    {
+        $info ??= self::latest();
+        $md = self::newer($info) ? (string) $info['changelog'] : '';
+        if (str_starts_with(ltrim($md), '{')) {
+            $j = json_decode($md, true);
+            $md = is_array($j) && ($j['encoding'] ?? '') === 'base64' ? (string) base64_decode((string) $j['content']) : '';
+        }
+        return $md !== '' ? $md : (string) @file_get_contents(DCN_DIR . 'CHANGELOG.md');
+    }
+
     /** Markdown minimo del changelog (titoli «## », elenchi «- », `codice`, **grassetto**) in HTML sicuro. */
     public static function markdown(string $md): string
     {
@@ -191,7 +202,8 @@ final class Updater
                 $out .= ($list ? '' : '<ul>') . '<li>' . $inline(substr($line, 2)) . '</li>';
                 $list = true;
             } elseif (str_starts_with($line, '## ')) {
-                $out .= '<h4>' . $inline(substr($line, 3)) . '</h4>';
+                $title = preg_split('/\s+[—-]\s+/u', substr($line, 3), 2);
+                $out .= '<h4>' . $inline($title[0]) . (isset($title[1]) ? ' <span style="font-weight:400;color:#787c82">' . esc_html($title[1]) . '</span>' : '') . '</h4>';
             } elseif ($line !== '' && !str_starts_with($line, '# ')) {
                 $out .= '<p>' . $inline($line) . '</p>';
             }

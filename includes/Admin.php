@@ -289,7 +289,7 @@ class Admin
         $info = Updater::latest();
         $newer = Updater::newer($info);
         $base = plugin_basename(DCN_FILE);
-        $md = $info['changelog'] !== '' ? $info['changelog'] : (string) @file_get_contents(DCN_DIR . 'CHANGELOG.md');
+        $md = Updater::changelog($info);
         ?>
         <div class="wrap dcn-wrap">
             <h1>Note cliente · Novità</h1>
@@ -323,7 +323,15 @@ class Admin
                 </tr>
             </table>
             <h2>Registro delle versioni</h2>
-            <div class="dcn-changelog" style="max-width:760px;background:#fff;border:1px solid #dcdcde;padding:4px 20px 12px">
+            <style>
+                .dcn-changelog h4 { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 8px; padding-top: 16px; border-top: 1px solid #e4e4e7; font-size: 15px; }
+                .dcn-changelog h4:first-child { margin-top: 12px; padding-top: 0; border-top: 0; }
+                .dcn-changelog ul { margin: 0 0 4px 18px; list-style: disc; }
+                .dcn-changelog li { margin: 0 0 6px; line-height: 1.5; }
+                .dcn-changelog p { margin: 0 0 8px; color: #50575e; }
+                .dcn-changelog code { background: #f3f3f0; padding: 1px 5px; border-radius: 4px; }
+            </style>
+            <div class="dcn-changelog" style="max-width:760px;background:#fff;border:1px solid #dcdcde;padding:4px 22px 16px">
                 <?php echo wp_kses_post(Updater::markdown($md)); ?>
             </div>
             <?php echo self::signature(); // statica ?>

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.2 — 2026-10-28
+- Pagina «Novità»: registro delle versioni come elenco leggibile (versione e data in evidenza); se il plugin è aggiornato si legge il registro locale, e una risposta grezza di GitHub in cache non si vede più.
+
 ## 1.5.1 — 2026-10-28
 - Fix: nella pagina «Novità» il registro delle versioni mostrava la risposta grezza di GitHub invece del testo.
 
