@@ -186,6 +186,8 @@ class Plugin
             'path'     => (string) $meta('path'),
             'url'      => (string) $meta('url'),
             'selector' => (string) $meta('selector'),
+            'sel2'     => (string) $meta('sel2'),
+            'anchor'   => json_decode((string) $meta('anchor'), true) ?: null,
             'rx'       => (float) $meta('rx'),
             'ry'       => (float) $meta('ry'),
             'px'       => (float) $meta('px'),

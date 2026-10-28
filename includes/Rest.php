@@ -34,6 +34,9 @@ class Rest
             ['methods' => 'GET', 'callback' => [self::class, 'ready_state'], 'permission_callback' => [self::class, 'can_use']],
             ['methods' => 'POST', 'callback' => [self::class, 'ready_send'], 'permission_callback' => [self::class, 'can_use']],
         ]);
+        register_rest_route(self::NS, '/notes/(?P<id>\d+)/anchor', [
+            ['methods' => 'POST', 'callback' => [self::class, 'anchor'], 'permission_callback' => static fn () => Plugin::enabled() && current_user_can('edit_posts')],
+        ]);
         register_rest_route(self::NS, '/notes/(?P<id>\d+)/status', [
             ['methods' => 'POST', 'callback' => [self::class, 'status'], 'permission_callback' => static fn () => Plugin::enabled() && current_user_can('edit_posts')],
         ]);
@@ -110,6 +113,8 @@ class Rest
             'path'     => $path,
             'url'      => esc_url_raw((string) $r->get_param('url')),
             'selector' => mb_substr(sanitize_text_field((string) $r->get_param('selector')), 0, 500),
+            'sel2'     => mb_substr(sanitize_text_field((string) $r->get_param('sel2')), 0, 500),
+            'anchor'   => wp_slash(self::anchor_json($r->get_param('anchor'))), // update_post_meta toglie le barre: il JSON le contiene
             'rx'       => self::unit($r->get_param('rx')),
             'ry'       => self::unit($r->get_param('ry')),
             'px'       => self::unit($r->get_param('px')),
@@ -179,6 +184,39 @@ class Rest
         }
 
         return new \WP_REST_Response(Plugin::format($note), 201);
+    }
+
+    /** POST /notes/{id}/anchor (team): aggiorna selettore e impronta dell'elemento (nota vecchia senza impronta o elemento ritrovato altrove). */
+    public static function anchor(\WP_REST_Request $r)
+    {
+        $note = get_post((int) $r['id']);
+        $json = self::anchor_json($r->get_param('anchor'));
+        if (!$note || $note->post_type !== Plugin::NOTE || $json === '') {
+            return new \WP_Error('dcn_400', 'Richiesta non valida.', ['status' => 400]);
+        }
+        update_post_meta($note->ID, '_dcn_selector', mb_substr(sanitize_text_field((string) $r->get_param('selector')), 0, 500));
+        update_post_meta($note->ID, '_dcn_sel2', mb_substr(sanitize_text_field((string) $r->get_param('sel2')), 0, 500));
+        update_post_meta($note->ID, '_dcn_anchor', wp_slash($json));
+
+        return new \WP_REST_Response(Plugin::format($note));
+    }
+
+    /** Impronta dell'elemento: struttura attesa, testi ripuliti e lunghezza limitata. '' se non valida. */
+    private static function anchor_json($raw): string
+    {
+        if (!is_array($raw) || empty($raw['tag'])) {
+            return '';
+        }
+        $clean = static function ($v) use (&$clean) {
+            if (is_array($v)) {
+                return array_slice(array_map($clean, $v), 0, 12, true);
+            }
+
+            return is_string($v) ? mb_substr(sanitize_text_field($v), 0, 120) : (is_numeric($v) ? $v : null);
+        };
+        $json = (string) wp_json_encode($clean($raw));
+
+        return strlen($json) <= 4000 ? $json : '';
     }
 
     public static function status(\WP_REST_Request $r)

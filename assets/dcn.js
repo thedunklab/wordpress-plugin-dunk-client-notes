@@ -50,6 +50,8 @@
         document.head.append(h('style', { id: 'dcn-font' }, `@font-face{font-family:'DM Sans';font-style:normal;font-weight:100 1000;font-display:swap;src:url('${cfg.font}') format('woff2');}`))
     }
 
+    const inRoot = (el) => el === host || host.contains(el)
+
     const pinsLayer = h('div')
     const hl = h('div', { class: 'hl', hidden: true })
     const fab = h('button', { class: 'fab', type: 'button', 'aria-label': 'Note del cliente', onclick: () => togglePanel() })
@@ -84,9 +86,116 @@
     }
     const safeQuery = (sel) => { try { return sel ? document.querySelector(sel) : null } catch { return null } }
 
+    /* ---------- ancoraggio robusto all'elemento ----------
+     * Un percorso CSS con nth-of-type si sposta quando si toglie o si aggiunge un elemento vicino: la puntina finirebbe
+     * sull'elemento sbagliato. Per questo alla nota si salvano anche l'«impronta» dell'elemento (tag, id, classi stabili,
+     * attributi, testo, antenati, fratelli) e un selettore semantico; quando si ripristina la puntina il candidato va
+     * sempre confrontato con l'impronta e, se non combacia, l'elemento si cerca per somiglianza. Se non esiste più,
+     * la nota resta «non agganciata» (posizione approssimata) invece di spostarsi su un altro elemento. */
+    const norm = (t) => (t || '').replace(/\s+/g, ' ').trim().toLowerCase()
+    const textOf = (el) => (el ? norm(el.textContent).slice(0, 80) : '')
+    const STATE_CLS = /^(is-|has-|js-|active$|open$|show$|shown$|hover|focus|current|selected|swiper|slick|aos|dcn|ready$|loaded$|visible$|hidden$)/i
+    const stableCls = (c) => c && c.length < 40 && !STATE_CLS.test(c) && !/\d{3,}/.test(c)
+    const classesOf = (el) => [...el.classList].filter(stableCls).slice(0, 6)
+    const validId = (el) => el.id && /^[A-Za-z][\w-]*$/.test(el.id) && !/\d{4,}/.test(el.id)
+    const fileOf = (v) => (v || '').split('#')[0].split('?')[0].split('/').filter(Boolean).pop() || ''
+    const ATTRS = ['href', 'src', 'alt', 'name', 'aria-label', 'title', 'placeholder', 'for', 'type', 'role']
+    const attrsOf = (el) => {
+        const o = {}
+        ATTRS.forEach((k) => {
+            const v = el.getAttribute(k)
+            if (v) o[k] = (k === 'href' || k === 'src') ? fileOf(v).slice(0, 80) : norm(v).slice(0, 80)
+        })
+        return o
+    }
+    const ancestorsOf = (el) => {
+        const out = []
+        for (let p = el.parentElement; p && p !== document.body && out.length < 4; p = p.parentElement) out.push({ tag: p.tagName.toLowerCase(), id: validId(p) ? p.id : '', cls: classesOf(p).slice(0, 4) })
+        return out
+    }
+    const fingerprint = (el) => ({
+        tag: el.tagName.toLowerCase(), id: validId(el) ? el.id : '', cls: classesOf(el), attrs: attrsOf(el), text: textOf(el),
+        anc: ancestorsOf(el), prev: textOf(el.previousElementSibling), next: textOf(el.nextElementSibling),
+    })
+    // selettore semantico: id, oppure tag + classi stabili, risalendo gli antenati finché è unico (niente nth-of-type)
+    const stableSelector = (el) => {
+        const unique = (q) => { try { return document.querySelectorAll(q).length === 1 } catch { return false } }
+        const part = (e) => (validId(e) ? '#' + CSS.escape(e.id) : e.tagName.toLowerCase() + classesOf(e).slice(0, 3).map((c) => '.' + CSS.escape(c)).join(''))
+        const parts = []
+        for (let cur = el, i = 0; cur && cur !== document.documentElement && i < 5; cur = cur.parentElement, i++) {
+            parts.unshift(part(cur))
+            const q = parts.join(' > ')
+            if (unique(q)) return q
+            if (validId(cur) || cur === document.body) break
+        }
+        return ''
+    }
+    // somiglianza fra un elemento e l'impronta salvata: 0..1 (solo sui dati che l'impronta contiene)
+    const similarity = (el, fp) => {
+        if (el.tagName.toLowerCase() !== fp.tag) return 0
+        let got = 0, max = 0
+        const add = (w, ok) => { max += w; if (ok) got += w }
+        if (fp.id) add(8, el.id === fp.id)
+        if (fp.cls.length) { const c = classesOf(el); add(4, false); got += 4 * fp.cls.filter((x) => c.includes(x)).length / Math.max(fp.cls.length, c.length) }
+        const at = attrsOf(el)
+        Object.entries(fp.attrs || {}).forEach(([k, v]) => add(3, at[k] === v))
+        if (fp.text) {
+            const t = textOf(el)
+            const l = Math.min(30, fp.text.length)
+            add(6, t === fp.text || (t.length > 0 && (t.startsWith(fp.text.slice(0, l)) || fp.text.startsWith(t.slice(0, l)))))
+        }
+        const anc = ancestorsOf(el)
+        ;(fp.anc || []).slice(0, 3).forEach((a, i) => add(1.5, !!anc[i] && anc[i].tag === a.tag && (!a.id || anc[i].id === a.id) && (!a.cls.length || a.cls.some((c) => anc[i].cls.includes(c)))))
+        if (fp.prev) add(1.5, textOf(el.previousElementSibling) === fp.prev)
+        if (fp.next) add(1.5, textOf(el.nextElementSibling) === fp.next)
+        return max ? got / max : 0
+    }
+    const search = (fp) => {
+        let pool
+        if (fp.id && document.getElementById(fp.id)) pool = [document.getElementById(fp.id)]
+        else {
+            const first = fp.cls[0] ? '.' + CSS.escape(fp.cls[0]) : ''
+            try { pool = [...document.querySelectorAll(fp.tag + first)] } catch { pool = [] }
+            if (!pool.length && first) pool = [...document.querySelectorAll(fp.tag)]
+        }
+        let best = null, bestS = 0, second = 0
+        pool.filter((e) => !inRoot(e)).slice(0, 4000).forEach((e) => {
+            const v = similarity(e, fp)
+            if (v > bestS) { second = bestS; best = e; bestS = v } else if (v > second) second = v
+        })
+        return best && bestS >= 0.7 && bestS - second >= 0.08 ? best : null
+    }
+    const anchored = new Map() // id nota → { el, how } oppure { el: null, at } se non trovato (si riprova dopo 2 secondi)
+    // restituisce l'elemento della nota: dal selettore (validato con l'impronta) o cercato per somiglianza
+    const resolve = (n) => {
+        const c = anchored.get(n.id)
+        if (c && (c.el ? c.el.isConnected : Date.now() - c.at < 2000)) return c.el
+        let el = null, how = 'selector'
+        if (!n.anchor) el = safeQuery(n.selector)
+        else {
+            for (const q of [n.sel2, n.selector]) {
+                const e = safeQuery(q)
+                if (e && !inRoot(e) && similarity(e, n.anchor) >= 0.6) { el = e; break }
+            }
+            if (!el) { el = search(n.anchor); how = 'search' }
+        }
+        anchored.set(n.id, el ? { el, how } : { el: null, at: Date.now() })
+        if (el && cfg.team) maintain(n, el, how)
+        return el
+    }
+    // il team aggiorna l'ancoraggio salvato: note vecchie senza impronta (la prendono ora che l'elemento c'è) o elemento ritrovato in un altro punto
+    const maintained = new Set()
+    const maintain = (n, el, how) => {
+        if (maintained.has(n.id) || (n.anchor && how === 'selector')) return
+        maintained.add(n.id)
+        api(`/notes/${n.id}/anchor`, { method: 'POST', body: { selector: cssPath(el), sel2: stableSelector(el), anchor: fingerprint(el) } })
+            .then((u) => { Object.assign(n, { selector: u.selector, sel2: u.sel2, anchor: u.anchor }) }).catch(() => {})
+    }
+    const isLost = (n) => !!n.anchor && !resolve(n)
+
     /* ---------- posizione delle puntine ---------- */
     const pointFor = (n) => {
-        const el = safeQuery(n.selector)
+        const el = resolve(n)
         if (el) {
             const r = el.getBoundingClientRect()
             if (r.width > 0 && r.height > 0) return { x: r.left + n.rx * r.width, y: r.top + n.ry * r.height, exact: true }
@@ -280,6 +389,7 @@
                 h('span', { class: 'item-meta' },
                     h('span', {}, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : ''),
                     state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
+                    n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
                     n.status !== 'open' ? statusBadge(n.status) : null)
             )
         )))
@@ -291,7 +401,7 @@
         state.current = id
         state.view = 'note'
         panel.hidden = false
-        const el = safeQuery(n.selector)
+        const el = resolve(n)
         if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
         renderPins()
         renderPanel()
@@ -304,7 +414,7 @@
             h('div', { class: 'by' }, numBadge(n),
                 h('div', { class: 'by-info' },
                     h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null),
-                    h('div', { class: 'by-meta' }, n.date, statusBadge(n.status)))),
+                    h('div', { class: 'by-meta' }, n.date, statusBadge(n.status), n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null))),
             h('p', {}, n.text),
             n.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + n.tagged.join(', ')) : null,
             n.shot ? h('a', { class: 'shot', href: n.shot, target: '_blank', rel: 'noopener' }, h('img', { src: n.shot, alt: 'Screenshot della pagina al momento della nota', loading: 'lazy' })) : null
@@ -337,7 +447,6 @@
     }
 
     /* ---------- nuova nota: scelta dell'elemento ---------- */
-    const inRoot = (el) => el === host || host.contains(el)
     const target = (e) => { const t = e.target; return t && t.nodeType === 1 && !inRoot(t) && t !== document.documentElement ? t : null }
 
     const onMove = (e) => {
@@ -353,7 +462,7 @@
         e.preventDefault(); e.stopPropagation()
         const r = t.getBoundingClientRect()
         const pick = {
-            selector: cssPath(t),
+            selector: cssPath(t), sel2: stableSelector(t), anchor: fingerprint(t),
             rx: r.width ? Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) : 0.5,
             ry: r.height ? Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) : 0.5,
             px: (e.clientX + scrollX) / document.documentElement.scrollWidth,
@@ -434,7 +543,7 @@
                     form.hidden = false
                 }
                 const note = await api('/notes', { method: 'POST', body: {
-                    path, url: location.href.split('#')[0], selector: pick.selector, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
+                    path, url: location.href.split('#')[0], selector: pick.selector, sel2: pick.sel2, anchor: pick.anchor, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
                     vw: innerWidth, text: text.value, author: name.value, screenshot, tag: tags.value(),
                 } })
                 closeComposer()
