@@ -132,7 +132,7 @@ class Rest
             'buttons' => [['label' => 'Apri la nota', 'url' => $link, 'primary' => true], ['label' => 'Gestisci in bacheca', 'url' => admin_url('admin.php?page=dcn-notes&note=' . $id)]],
         ]);
 
-        self::tag($r, get_post($id), $id, $author, $text, false);
+        self::tag($r, get_post($id), $id, $author, $text, 'note');
 
         return new \WP_REST_Response(Plugin::format(get_post($id)), 201);
     }
@@ -146,7 +146,14 @@ class Rest
         if ($e = self::throttle()) {
             return $e;
         }
-        $text = self::text((string) $r->get_param('text'));
+        $text   = self::text((string) $r->get_param('text'));
+        $status = (string) (get_post_meta($note->ID, '_dcn_status', true) ?: 'open');
+        $kind   = 'reply';
+        // il team può rispondere senza testo se ha cambiato lo stato (es. «Risolta»): la risposta è solo l'avviso del nuovo stato
+        if ($text === '' && self::is_team() && Plugin::status_text($status) !== '') {
+            $text = Plugin::status_text($status);
+            $kind = $status;
+        }
         if ($text === '') {
             return new \WP_Error('dcn_text', 'Scrivi una risposta.', ['status' => 400]);
         }
@@ -159,7 +166,7 @@ class Rest
         update_post_meta($id, '_dcn_author', $author);
         update_post_meta($id, '_dcn_source', self::is_team() ? 'team' : 'client');
 
-        self::tag($r, $note, $id, $author, $text, true);
+        self::tag($r, $note, $id, $author, $text, $kind);
 
         if (!self::is_team()) {
             $n = (int) get_post_meta($note->ID, '_dcn_n', true);
@@ -219,7 +226,7 @@ class Rest
      * Segnala una nota o una risposta alle persone esterne scelte (`tag` = id dei contatti, max 5): una email a testa.
      * Salva i nomi sulla nota/risposta e li restituisce.
      */
-    private static function tag(\WP_REST_Request $r, \WP_Post $note, int $post_id, string $author, string $text, bool $is_reply): void
+    private static function tag(\WP_REST_Request $r, \WP_Post $note, int $post_id, string $author, string $text, string $kind): void
     {
         $ids = array_slice(array_filter(array_map('sanitize_key', (array) $r->get_param('tag'))), 0, 5);
         if (!$ids) {
@@ -241,17 +248,23 @@ class Rest
             }
             $c       = $by[$id];
             $names[] = $c['name'];
-            $title   = $is_reply ? "Una risposta alla nota #$n" : "Una nota per te: #$n";
-            $intro   = "Ciao {$c['name']},\n$author ti ha segnalato " . ($is_reply ? "una risposta alla nota #$n" : "la nota #$n") . " sulla pagina $path.";
+            $title   = ['note' => "Una nota per te: #$n", 'reply' => "Una risposta alla nota #$n", 'resolved' => "Nota #$n risolta", 'progress' => "Nota #$n in lavorazione"][$kind];
+            $intro   = "Ciao {$c['name']},\n" . [
+                'note'     => "$author ti ha segnalato la nota #$n sulla pagina $path.",
+                'reply'    => "$author ti ha segnalato una risposta alla nota #$n sulla pagina $path.",
+                'resolved' => "$author ha segnato come risolta la nota #$n sulla pagina $path.",
+                'progress' => "$author ha preso in carico la nota #$n sulla pagina $path: è in lavorazione.",
+            ][$kind];
+            $body    = in_array($kind, ['note', 'reply'], true) ? $text : $note->post_content;
             Mail::send($c['email'], '[' . Plugin::label() . '] ' . $title, [
                 'project' => Plugin::label(),
                 'title'   => $title,
                 'intro'   => $intro,
-                'items'   => [['n' => $n, 'author' => $author, 'text' => $text]],
-                'image'   => $is_reply ? '' : $image,
+                'items'   => [['n' => $n, 'author' => $kind === 'note' || $kind === 'reply' ? $author : (string) get_post_meta($note->ID, '_dcn_author', true), 'text' => $body]],
+                'image'   => $kind === 'note' ? $image : '',
                 'buttons' => [['label' => 'Apri la pagina nel punto della nota', 'url' => $link, 'primary' => true]],
                 'footer'  => 'Per aprire la pagina serve la password di accesso allo staging: chiedila a chi ti ha scritto. · DUNK Client Notes',
-            ], "$intro\n\n$text\n\nApri la pagina: $link\n");
+            ], "$intro\n\n$body\n\nApri la pagina: $link\n");
         }
         if ($names) {
             update_post_meta($post_id, '_dcn_tagged', $names);

@@ -119,6 +119,12 @@ class Plugin
         return array_values(array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email'])));
     }
 
+    /** Testo automatico di una risposta senza messaggio, quando il team ha cambiato lo stato della nota. */
+    public static function status_text(string $status): string
+    {
+        return ['resolved' => 'Nota segnata come risolta.', 'progress' => 'Nota presa in carico: in lavorazione.'][$status] ?? '';
+    }
+
     /**
      * Salva una nota o una risposta. Il testo è già ripulito (sanitize_textarea_field) e viene mostrato sempre come testo:
      * senza questo, i filtri kses applicati a chi non ha unfiltered_html trasformano «>» in «&gt;».

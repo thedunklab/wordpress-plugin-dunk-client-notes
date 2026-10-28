@@ -354,7 +354,7 @@ class Admin
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <?php wp_nonce_field('dcn_reply_' . $n['id']); ?>
                         <input type="hidden" name="action" value="dcn_reply"><input type="hidden" name="note" value="<?php echo (int) $n['id']; ?>">
-                        <textarea name="text" rows="4" class="large-text" placeholder="Rispondi al cliente…" required></textarea>
+                        <textarea name="text" rows="4" class="large-text" placeholder="Rispondi al cliente… (facoltativo se la nota è «Risolta» o «In lavorazione»: invia solo lo stato)"></textarea>
                         <p><button class="button button-primary">Invia risposta</button></p>
                     </form>
                 </div>
@@ -408,6 +408,10 @@ class Admin
     {
         $id   = self::guard('dcn_reply');
         $text = mb_substr(trim(sanitize_textarea_field(wp_unslash((string) ($_POST['text'] ?? '')))), 0, 2000);
+        if ($text === '') {
+            // senza testo vale come avviso del nuovo stato (es. «Risolta»), se la nota non è più aperta
+            $text = Plugin::status_text((string) (get_post_meta($id, '_dcn_status', true) ?: 'open'));
+        }
         if ($text !== '') {
             $rid = Plugin::insert(['post_type' => Plugin::REPLY, 'post_status' => 'publish', 'post_parent' => $id, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text]);
             update_post_meta($rid, '_dcn_author', wp_get_current_user()->display_name);

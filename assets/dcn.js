@@ -318,8 +318,12 @@
         }
         n.replies.forEach((r) => body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', h('span', { class: 'meta' }, ' · ' + r.date), h('p', {}, r.text), r.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + r.tagged.join(', ')) : null)))
         const name = h('input', { type: 'text', placeholder: 'Il tuo nome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, 'aria-label': 'Il tuo nome' })
-        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, required: true, 'aria-label': 'Risposta' })
+        // il team può inviare anche senza testo se la nota è «Risolta» o «In lavorazione»: parte solo l'avviso del nuovo stato
+        const statusOnly = cfg.team && n.status !== 'open'
+        const text = h('textarea', { placeholder: statusOnly ? 'Facoltativa: scrivi un messaggio o invia solo lo stato…' : 'Scrivi una risposta…', maxlength: 2000, required: !statusOnly, 'aria-label': 'Risposta' })
         const send = h('button', { class: 'btn primary', type: 'submit' }, 'Rispondi')
+        if (statusOnly) text.addEventListener('input', () => { send.textContent = text.value.trim() ? 'Rispondi' : `Invia: ${STATUS[n.status].toLowerCase()}` })
+        if (statusOnly) send.textContent = `Invia: ${STATUS[n.status].toLowerCase()}`
         const tags = tagPicker()
         body.append(h('form', { class: 'form', onsubmit: async (e) => {
             e.preventDefault()
