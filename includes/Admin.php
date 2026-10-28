@@ -92,6 +92,8 @@ class Admin
         register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_autoclose', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_github_token', ['type' => 'string', 'sanitize_callback' => static fn ($v) => trim((string) $v) !== '' ? trim((string) $v) : (string) get_option('dcn_github_token', '')]);
+        register_setting('dcn', 'dcn_fab_side', ['type' => 'string', 'sanitize_callback' => static fn ($v) => $v === 'left' ? 'left' : 'right']);
+        register_setting('dcn', 'dcn_fab_bottom', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => max(0, min(400, (int) $v))]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     }
 
@@ -196,6 +198,17 @@ class Admin
                     <tr>
                         <th scope="row"><label for="dcn_label">Nome del progetto</label></th>
                         <td><input type="text" id="dcn_label" name="dcn_label" class="regular-text" value="<?php echo esc_attr((string) get_option('dcn_label', '')); ?>" placeholder="<?php echo esc_attr(get_bloginfo('name')); ?>"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Posizione del pulsante</th>
+                        <td>
+                            <select name="dcn_fab_side">
+                                <option value="right" <?php selected(get_option('dcn_fab_side', 'right'), 'right'); ?>>In basso a destra</option>
+                                <option value="left" <?php selected(get_option('dcn_fab_side', 'right'), 'left'); ?>>In basso a sinistra</option>
+                            </select>
+                            <input type="number" name="dcn_fab_bottom" class="small-text" min="0" max="400" value="<?php echo esc_attr((string) (int) get_option('dcn_fab_bottom', 0)); ?>"> px dal bordo basso
+                            <p class="description">Se un altro widget fisso (es. l'icona preferenze di Iubenda, la chat) copre il pulsante «Note», spostalo di lato o alzalo. 0 = posizione standard (20 px).</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row">Dopo l'invio</th>

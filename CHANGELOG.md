@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0 — 2026-10-28
+- Nuova impostazione «Posizione del pulsante»: lato (destra o sinistra) e distanza dal bordo basso, per non sovrapporsi ad altri widget fissi (Iubenda, chat).
+- Il pannello delle note segue la posizione del pulsante.
+
 ## 1.4.0 — 2026-10-28
 Aggiornamenti da sito a sito e registro delle novità.
 - Il plugin si aggiorna dalla bacheca di WordPress (Plugin → «Aggiorna ora», anche automatico) leggendo l'ultimo tag `vX.Y.Z` della repo GitHub: niente più deploy per ogni nuova versione.

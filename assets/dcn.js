@@ -55,6 +55,8 @@
     const pinsLayer = h('div')
     const hl = h('div', { class: 'hl', hidden: true })
     const fab = h('button', { class: 'fab', type: 'button', 'aria-label': 'Note del cliente', onclick: () => togglePanel() })
+    if (cfg.fab?.side === 'left') Object.assign(fab.style, { left: '20px', right: 'auto' })
+    if (cfg.fab?.bottom > 0) { fab.style.bottom = cfg.fab.bottom + 'px'; root.style.setProperty('--panel-b', (cfg.fab.bottom + 60) + 'px') }
     const panel = h('div', { class: 'panel', hidden: true, role: 'dialog', 'aria-label': 'Note del cliente' })
     const overlay = h('div') // composer, hint, toast
     root.append(pinsLayer, hl, panel, fab, overlay)

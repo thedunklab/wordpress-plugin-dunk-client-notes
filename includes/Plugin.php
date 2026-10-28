@@ -91,6 +91,7 @@ class Plugin
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
             'ready'  => !$team && (bool) self::ready_users(), // lo segnala il cliente: chi è nel team lo riceve
             'autoclose' => (bool) get_option('dcn_autoclose', 1), // chiude il pannello dopo l'invio di una risposta
+            'fab'    => ['side' => get_option('dcn_fab_side', 'right') === 'left' ? 'left' : 'right', 'bottom' => (int) get_option('dcn_fab_bottom', 0)], // posizione del pulsante (per non coprire altri widget, es. Iubenda)
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');
