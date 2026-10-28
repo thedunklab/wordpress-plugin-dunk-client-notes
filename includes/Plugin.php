@@ -90,6 +90,7 @@ class Plugin
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
             'ready'  => !$team && (bool) self::ready_users(), // lo segnala il cliente: chi è nel team lo riceve
+            'autoclose' => (bool) get_option('dcn_autoclose', 1), // chiude il pannello dopo l'invio di una risposta
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
         ]) . ';', 'before');

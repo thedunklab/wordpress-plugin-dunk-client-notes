@@ -88,6 +88,7 @@ class Admin
         register_setting('dcn', 'dcn_smtp_pass', ['type' => 'string', 'sanitize_callback' => static fn ($v) => trim((string) $v) !== '' ? trim((string) $v) : (string) get_option('dcn_smtp_pass', '')]);
         register_setting('dcn', 'dcn_smtp_from', ['type' => 'string', 'sanitize_callback' => 'sanitize_email']);
         register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('dcn', 'dcn_autoclose', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     }
 
@@ -192,6 +193,13 @@ class Admin
                     <tr>
                         <th scope="row"><label for="dcn_label">Nome del progetto</label></th>
                         <td><input type="text" id="dcn_label" name="dcn_label" class="regular-text" value="<?php echo esc_attr((string) get_option('dcn_label', '')); ?>" placeholder="<?php echo esc_attr(get_bloginfo('name')); ?>"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Dopo l'invio</th>
+                        <td>
+                            <label><input type="checkbox" name="dcn_autoclose" value="1" <?php checked((bool) get_option('dcn_autoclose', 1)); ?>> Chiudi il pannello dopo aver inviato una risposta</label>
+                            <p class="description">Così si può scegliere subito un'altra nota nel sito. Se disattivato, la conversazione resta aperta.</p>
+                        </td>
                     </tr>
                     <tr>
                         <th scope="row">Email al team</th>

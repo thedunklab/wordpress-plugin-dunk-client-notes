@@ -442,6 +442,7 @@
                 if (!cfg.team) saveName(name.value.trim())
                 await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, author: name.value, tag: tags.value() } })
                 await load()
+                if (cfg.autoclose) { panel.hidden = true; state.view = 'list'; renderPins(); renderPanel() }
             } catch (err) { toast(err.message); send.disabled = false }
         } }, name, text, tags.el, send))
     }

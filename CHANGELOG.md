@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0 — 2026-10-28
+- Nuova impostazione «Dopo l'invio»: il pannello si chiude dopo l'invio di una risposta, così si può scegliere subito un'altra nota (attiva di default).
+
 ## 1.2.0 — 2026-10-28
 Ancoraggio robusto delle note agli elementi della pagina.
 - Alla nota si salvano, oltre al percorso CSS, l'impronta dell'elemento (tag, id, classi stabili, attributi, testo, antenati, fratelli) e un selettore semantico senza `nth-of-type`.
