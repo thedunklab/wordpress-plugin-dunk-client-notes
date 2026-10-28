@@ -516,12 +516,7 @@
                 }),
                 new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
             ])
-            const ctx = canvas.getContext('2d')
-            const x = cx * scale, y = cy * scale, r = 16 * scale
-            ctx.lineWidth = Math.max(3, 4 * scale)
-            ctx.strokeStyle = '#0a0a0a'
-            ctx.fillStyle = 'rgba(254,224,0,.55)'
-            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+            // la puntina numerata la disegna il server (è lui ad assegnare il numero della nota)
             return canvas.toDataURL('image/jpeg', 0.72)
         } catch { return '' }
     }
@@ -547,7 +542,7 @@
                 }
                 const note = await api('/notes', { method: 'POST', body: {
                     path, url: location.href.split('#')[0], selector: pick.selector, sel2: pick.sel2, anchor: pick.anchor, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
-                    vw: innerWidth, text: text.value, author: name.value, screenshot, tag: tags.value(),
+                    vw: innerWidth, text: text.value, author: name.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / innerHeight, tag: tags.value(),
                 } })
                 closeComposer()
                 toast('Nota inviata. Grazie!')

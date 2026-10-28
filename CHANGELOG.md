@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.0 — 2026-10-28
+- Lo screenshot delle nuove note mostra la puntina numerata (stessa forma e colori di quella sul sito) con la punta nel punto indicato dal cliente, al posto del cerchio: se le puntine si spostano, si capisce comunque a cosa si riferiva la nota. Le note già salvate restano com'erano.
+
 ## 1.5.2 — 2026-10-28
 - Pagina «Novità»: registro delle versioni come elenco leggibile (versione e data in evidenza); se il plugin è aggiornato si legge il registro locale, e una risposta grezza di GitHub in cache non si vede più.
 

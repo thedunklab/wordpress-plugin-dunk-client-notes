@@ -125,7 +125,7 @@ class Rest
         foreach ($meta as $k => $v) {
             update_post_meta($id, '_dcn_' . $k, $v);
         }
-        if ($shot = self::save_shot((string) $r->get_param('screenshot'), $n)) {
+        if ($shot = self::save_shot((string) $r->get_param('screenshot'), $n, (float) $r->get_param('shot_fx'), (float) $r->get_param('shot_fy'))) {
             update_post_meta($id, '_dcn_shot', $shot);
         }
 
@@ -418,7 +418,7 @@ class Rest
     }
 
     /** Salva lo screenshot (data URL JPEG) in uploads/dunk-notes/ e restituisce il percorso relativo a uploads; '' se non valido. */
-    private static function save_shot(string $data, int $n): string
+    private static function save_shot(string $data, int $n, float $fx = -1, float $fy = -1): string
     {
         if (!preg_match('~^data:image/jpeg;base64,([A-Za-z0-9+/=]+)$~', $data, $m)) {
             return '';
@@ -432,6 +432,8 @@ class Rest
             return '';
         }
 
+        $bin = self::stamp($bin, $n, $fx, $fy);
+
         $up  = wp_get_upload_dir();
         $dir = trailingslashit($up['basedir']) . 'dunk-notes';
         wp_mkdir_p($dir);
@@ -441,5 +443,67 @@ class Rest
         }
 
         return 'dunk-notes/' . $name;
+    }
+
+    /**
+     * Disegna sullo screenshot la puntina numerata (stessa forma e colori di quella sul sito) con la punta nel
+     * punto cliccato: se poi le puntine si spostano, lo screenshot dice a cosa si riferiva il cliente.
+     * $fx/$fy sono la posizione del clic come frazione della larghezza/altezza. Senza GD o su errore restituisce l'immagine com'è.
+     */
+    private static function stamp(string $bin, int $n, float $fx, float $fy): string
+    {
+        $font = DCN_DIR . 'assets/fonts/dm-sans-latin-700.ttf';
+        if ($fx < 0 || $fx > 1 || $fy < 0 || $fy > 1 || !function_exists('imagettftext') || !function_exists('imagecreatefromstring') || !is_readable($font)) {
+            return $bin;
+        }
+        $img = @imagecreatefromstring($bin);
+        if (!$img) {
+            return $bin;
+        }
+        $w = imagesx($img);
+        $h = imagesy($img);
+        $x = $fx * $w;
+        $y = $fy * $h;
+        $r = max(13.0, min(22.0, $w / 1280 * 16 + 4));   // raggio del cerchio, in px dell'immagine
+        $b = max(2.0, $r / 6);                            // bordo scuro
+        $k = 4;                                           // sovracampionamento per i bordi lisci
+        $tip = $r * 1.414;                                // dal centro del cerchio alla punta
+        $sw = (int) ceil(($r + $b) * 2 * $k);
+        $sh = (int) ceil(($r + $b + $tip + $b * 1.414 + 1) * $k); // fino alla punta del bordo
+        $spr = imagecreatetruecolor($sw, $sh);
+        imagealphablending($spr, false);
+        imagesavealpha($spr, true);
+        imagefill($spr, 0, 0, imagecolorallocatealpha($spr, 0, 0, 0, 127));
+        imagealphablending($spr, true);
+        $cx = $sw / 2;
+        $cy = ($r + $b) * $k;
+        $drop = static function (float $rad, int $col) use ($spr, $cx, $cy, $k, $tip, $r): void {
+            $rr = $rad * $k;
+            $d = $tip * $k * ($rad / $r);
+            imagefilledellipse($spr, (int) $cx, (int) $cy, (int) (2 * $rr), (int) (2 * $rr), $col);
+            $a = M_PI / 4;
+            imagefilledpolygon($spr, [
+                (int) ($cx - $rr * cos($a)), (int) ($cy + $rr * sin($a)),
+                (int) ($cx + $rr * cos($a)), (int) ($cy + $rr * sin($a)),
+                (int) $cx, (int) ($cy + $d),
+            ], $col);
+        };
+        $drop($r + $b, imagecolorallocate($spr, 18, 18, 18));
+        $drop($r, imagecolorallocate($spr, 253, 224, 0));
+        $label = (string) $n;
+        $size = $r * $k * (strlen($label) > 2 ? 0.8 : 1.0);
+        $box = imagettfbbox($size, 0, $font, $label);
+        if ($box) {
+            imagettftext($spr, $size, 0, (int) ($cx - ($box[2] + $box[0]) / 2), (int) ($cy - ($box[7] + $box[1]) / 2), imagecolorallocate($spr, 26, 22, 0), $font, $label);
+        }
+        $dw = (int) round($sw / $k);
+        $dh = (int) round($sh / $k);
+        imagealphablending($img, true);
+        imagecopyresampled($img, $spr, (int) round($x - $dw / 2), (int) round($y - $dh), 0, 0, $dw, $dh, $sw, $sh);
+        ob_start();
+        imagejpeg($img, null, 82);
+        $out = (string) ob_get_clean();
+
+        return $out !== '' ? $out : $bin;
     }
 }
