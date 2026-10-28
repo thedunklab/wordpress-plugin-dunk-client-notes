@@ -91,12 +91,12 @@ class Rest
         $path   = Plugin::normalize_path((string) $r->get_param('path'));
         $n      = (int) get_option('dcn_counter', 0) + 1;
 
-        $id = wp_insert_post([
+        $id = Plugin::insert([
             'post_type'    => Plugin::NOTE,
             'post_status'  => 'publish',
             'post_title'   => mb_substr($text, 0, 60),
             'post_content' => $text,
-        ], true);
+        ]);
         if (is_wp_error($id)) {
             return $id;
         }
@@ -152,7 +152,7 @@ class Rest
         }
 
         $author = self::author($r);
-        $id     = wp_insert_post(['post_type' => Plugin::REPLY, 'post_status' => 'publish', 'post_parent' => $note->ID, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text], true);
+        $id     = Plugin::insert(['post_type' => Plugin::REPLY, 'post_status' => 'publish', 'post_parent' => $note->ID, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text]);
         if (is_wp_error($id)) {
             return $id;
         }
@@ -198,7 +198,7 @@ class Rest
         if ($e = self::throttle()) {
             return $e;
         }
-        $name  = mb_substr(trim(sanitize_text_field(wp_unslash((string) $r->get_param('name')))), 0, 80);
+        $name  = mb_substr(trim(sanitize_text_field((string) $r->get_param('name'))), 0, 80);
         $email = sanitize_email((string) $r->get_param('email'));
         if ($name === '' || !is_email($email)) {
             return new \WP_Error('dcn_contact', 'Inserisci nome e cognome e un indirizzo email valido.', ['status' => 400]);
@@ -348,7 +348,7 @@ class Rest
 
     private static function text(string $raw): string
     {
-        return mb_substr(trim(sanitize_textarea_field(wp_unslash($raw))), 0, self::MAX_TEXT);
+        return mb_substr(trim(sanitize_textarea_field($raw)), 0, self::MAX_TEXT);
     }
 
     private static function author(\WP_REST_Request $r): string
@@ -356,7 +356,7 @@ class Rest
         if (self::is_team()) {
             return wp_get_current_user()->display_name;
         }
-        $name = mb_substr(trim(sanitize_text_field(wp_unslash((string) $r->get_param('author')))), 0, 60);
+        $name = mb_substr(trim(sanitize_text_field((string) $r->get_param('author'))), 0, 60);
 
         return $name !== '' ? $name : 'Cliente';
     }

@@ -409,7 +409,7 @@ class Admin
         $id   = self::guard('dcn_reply');
         $text = mb_substr(trim(sanitize_textarea_field(wp_unslash((string) ($_POST['text'] ?? '')))), 0, 2000);
         if ($text !== '') {
-            $rid = wp_insert_post(['post_type' => Plugin::REPLY, 'post_status' => 'publish', 'post_parent' => $id, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text]);
+            $rid = Plugin::insert(['post_type' => Plugin::REPLY, 'post_status' => 'publish', 'post_parent' => $id, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text]);
             update_post_meta($rid, '_dcn_author', wp_get_current_user()->display_name);
             update_post_meta($rid, '_dcn_source', 'team');
         }

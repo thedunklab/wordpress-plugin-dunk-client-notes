@@ -119,6 +119,21 @@ class Plugin
         return array_values(array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email'])));
     }
 
+    /**
+     * Salva una nota o una risposta. Il testo è già ripulito (sanitize_textarea_field) e viene mostrato sempre come testo:
+     * senza questo, i filtri kses applicati a chi non ha unfiltered_html trasformano «>» in «&gt;».
+     *
+     * @return int|\WP_Error
+     */
+    public static function insert(array $post)
+    {
+        kses_remove_filters();
+        $id = wp_insert_post(wp_slash($post), true);
+        kses_init();
+
+        return $id;
+    }
+
     /** Numero di note con lo stato indicato ('' = tutte). */
     public static function count(string $status = ''): int
     {
@@ -149,9 +164,9 @@ class Plugin
                 'id'     => $r->ID,
                 'author' => (string) get_post_meta($r->ID, '_dcn_author', true),
                 'source' => (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client',
-                'text'   => $r->post_content,
+                'text'   => wp_specialchars_decode($r->post_content, ENT_QUOTES),
                 'date'   => self::human_date($r),
-                'tagged' => array_values((array) get_post_meta($r->ID, '_dcn_tagged', true)),
+                'tagged' => array_values(array_filter((array) get_post_meta($r->ID, '_dcn_tagged', true))),
             ];
         }
 
@@ -160,7 +175,7 @@ class Plugin
             'n'        => (int) $meta('n'),
             'author'   => (string) $meta('author'),
             'source'   => (string) $meta('source') ?: 'client',
-            'text'     => $note->post_content,
+            'text'     => wp_specialchars_decode($note->post_content, ENT_QUOTES),
             'status'   => (string) $meta('status') ?: 'open',
             'path'     => (string) $meta('path'),
             'url'      => (string) $meta('url'),
@@ -172,7 +187,7 @@ class Plugin
             'vw'       => (int) $meta('vw'),
             'shot'     => $shot !== '' ? trailingslashit($up['baseurl']) . $shot : '',
             'date'     => self::human_date($note),
-            'tagged'   => array_values((array) $meta('tagged')),
+            'tagged'   => array_values(array_filter((array) $meta('tagged'))),
             'replies'  => $reply,
         ];
     }
