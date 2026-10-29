@@ -131,7 +131,7 @@ class Rest
             update_post_meta($id, '_dcn_' . $k, $v);
         }
         $key = self::key($id);
-        $pin = Plugin::group($meta['group'])['color'] ?? '';
+        $pin = self::is_team() ? Plugin::TEAM_COLOR : (Plugin::group($meta['group'])['color'] ?? '');
         if ($shot = self::save_shot((string) $r->get_param('screenshot'), $n, (float) $r->get_param('shot_fx'), (float) $r->get_param('shot_fy'), $pin)) {
             update_post_meta($id, '_dcn_shot', $shot);
         }
@@ -426,9 +426,17 @@ class Rest
     /** Gruppo di lavoro scelto da chi scrive ('' se nessuno o non più esistente). */
     private static function group_id(\WP_REST_Request $r): string
     {
+        // chi è nel team scrive come team, mai con un gruppo del cliente
+        if (self::is_team()) {
+            return '';
+        }
         $id = sanitize_key((string) $r->get_param('group'));
+        if ($id !== '' && Plugin::group($id)) {
+            return $id;
+        }
+        $groups = Plugin::groups();
 
-        return $id !== '' && Plugin::group($id) ? $id : '';
+        return count($groups) === 1 ? $groups[0]['id'] : '';
     }
 
     /** Contatto della rubrica con cui chi scrive si è identificato ('' se nessuno). */
@@ -527,7 +535,7 @@ class Rest
         };
         $drop($r + $b, imagecolorallocate($spr, 18, 18, 18));
         $fill = preg_match('/^#[0-9a-f]{6}$/i', $color) ? sscanf(substr($color, 1), '%02x%02x%02x') : [253, 224, 0];
-        $ink  = $color !== '' && Plugin::ink($color) === '#ffffff' ? [255, 255, 255] : [26, 22, 0];
+        $ink  = $color !== '' ? sscanf(substr(Plugin::ink($color), 1), '%02x%02x%02x') : [26, 22, 0];
         $drop($r, imagecolorallocate($spr, $fill[0], $fill[1], $fill[2]));
         $label = (string) $n;
         $size = $r * $k * (strlen($label) > 2 ? 0.8 : 1.0);

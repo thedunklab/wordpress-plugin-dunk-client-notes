@@ -100,6 +100,7 @@ class Admin
         register_setting('dcn', 'dcn_fab_side', ['type' => 'string', 'sanitize_callback' => static fn ($v) => $v === 'left' ? 'left' : 'right']);
         register_setting('dcn', 'dcn_fab_bottom', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => max(0, min(400, (int) $v))]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('dcn', 'dcn_team_label', ['type' => 'string', 'sanitize_callback' => static fn ($v) => mb_substr(trim(sanitize_text_field((string) $v)), 0, 30)]);
         register_setting('dcn', 'dcn_groups', ['type' => 'array', 'sanitize_callback' => [self::class, 'sanitize_groups']]);
     }
 
@@ -125,10 +126,10 @@ class Admin
         return $out;
     }
 
-    /** Etichetta colorata del gruppo (bacheca). */
-    private static function group_badge(string $id): string
+    /** Etichetta colorata del gruppo, o quella del team per chi è nel team (bacheca). */
+    private static function group_badge(string $id, string $source = 'client'): string
     {
-        $g = $id !== '' ? Plugin::group($id) : null;
+        $g = $source === 'team' ? ['name' => Plugin::team_label(), 'color' => Plugin::TEAM_COLOR] : ($id !== '' ? Plugin::group($id) : null);
 
         return $g ? ' <span style="display:inline-block;padding:2px 9px;border-radius:99px;background:' . esc_attr($g['color']) . ';color:' . esc_attr(Plugin::ink($g['color'])) . ';font-size:11px;font-weight:700;line-height:1.4;vertical-align:middle">' . esc_html($g['name']) . '</span>' : '';
     }
@@ -290,7 +291,7 @@ class Admin
                     <tr>
                         <th scope="row">Gruppi di lavoro</th>
                         <td>
-                            <p class="description" style="margin-top:0">I gruppi di chi commenta (es. Marketing, Regolatorio, Medico): chi scrive una nota sceglie il suo gruppo e la puntina prende quel colore. Senza gruppi le puntine restano gialle DUNK. Lo stato si riconosce comunque: <em>in lavorazione</em> ha un anello bianco, <em>risolta</em> la spunta verde.</p>
+                            <p class="description" style="margin-top:0">I gruppi del cliente (es. Marketing, Regolatorio, Medico): chi scrive una nota sceglie il suo gruppo e la puntina prende quel colore. Se c'è un solo gruppo (di base «Cliente») non si sceglie nulla. Lo stato si riconosce comunque: <em>in lavorazione</em> ha un anello bianco, <em>risolta</em> la spunta verde. Chi è loggato nel team non usa questi gruppi: scrive con il nome del team qui sotto.</p>
                             <table class="dcn-groups" style="margin-top:8px;border-collapse:collapse">
                                 <?php $rows = Plugin::groups(); $rows[] = ['id' => '', 'name' => '', 'color' => '#7c6cf0'];
                                 foreach ($rows as $i => $g) : ?>
@@ -301,7 +302,14 @@ class Admin
                                     </tr>
                                 <?php endforeach; ?>
                             </table>
-                            <p class="description">Per aggiungerne altri salva: si libera una nuova riga vuota. Rimuovendo un gruppo, le sue note restano ma tornano gialle.</p>
+                            <p class="description">Per aggiungerne altri salva: si libera una nuova riga vuota. Se crei i gruppi del cliente, rimuovi «Cliente». Rimuovendo un gruppo, le sue note restano ma senza colore di gruppo; se li rimuovi tutti torna «Cliente».</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="dcn_team_label">Nome del team</label></th>
+                        <td>
+                            <input type="text" id="dcn_team_label" name="dcn_team_label" class="regular-text" maxlength="30" value="<?php echo esc_attr((string) get_option('dcn_team_label', '')); ?>" placeholder="DUNK">
+                            <p class="description">Chi è loggato in WordPress come team scrive con questa etichetta (puntine nere con il numero giallo), separato dai gruppi del cliente. Es. DUNK, Agency.</p>
                         </td>
                     </tr>
                     <tr>
@@ -482,7 +490,7 @@ class Admin
                         <td><a href="<?php echo esc_url(admin_url('admin.php?page=dcn-notes&note=' . $n['id'])); ?>"><strong><?php echo esc_html(wp_trim_words($n['text'], 18)); ?></strong></a>
                             <?php if ($n['replies']) : ?><br><small><?php echo count($n['replies']); ?> rispost<?php echo count($n['replies']) === 1 ? 'a' : 'e'; ?></small><?php endif; ?></td>
                         <td><code><?php echo esc_html($n['path']); ?></code></td>
-                        <td><?php echo esc_html($n['author']); ?><?php echo $n['source'] === 'team' ? ' <small>(team)</small>' : ''; ?><?php echo $n['pending'] ? ' <small><em>(da confermare)</em></small>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?></td>
+                        <td><?php echo esc_html($n['author']); ?><?php echo $n['pending'] ? ' <small><em>(da confermare)</em></small>' : ''; ?><?php echo self::group_badge($n['group'], $n['source']); // già escapato ?></td>
                         <td><?php echo self::badge($n['status']); // già escapato ?></td>
                         <td><?php echo esc_html($n['date']); ?></td>
                     </tr>
@@ -523,7 +531,7 @@ class Admin
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;margin-top:16px;max-width:1200px">
                 <div>
                     <div class="postbox" style="padding:16px 20px">
-                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['source'] === 'team' ? ' (team)' : ''; ?><?php echo $n['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
+                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($n['group'], $n['source']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
                         <p style="font-size:15px;white-space:pre-wrap"><?php echo esc_html($n['text']); ?></p>
                         <p><a class="button button-primary" href="<?php echo esc_url($view); ?>" target="_blank" rel="noopener">Apri la pagina nel punto della nota</a> <code><?php echo esc_html($n['path']); ?></code></p>
                         <?php if ($n['shot']) : ?><p><a href="<?php echo esc_url($n['shot']); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($n['shot']); ?>" alt="Screenshot" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:8px"></a></p><?php endif; ?>
@@ -531,7 +539,7 @@ class Admin
                     <h2>Conversazione</h2>
                     <?php foreach ($n['replies'] as $r) : ?>
                         <div class="postbox" style="padding:10px 16px;<?php echo $r['source'] === 'team' ? 'border-left:4px solid #fee000' : ''; ?>">
-                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?><?php echo $r['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($r['group']); // già escapato ?> · <small><?php echo esc_html($r['date']); ?><?php echo $r['edited'] ? ' · modificata' : ''; ?></small>
+                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($r['group'], $r['source']); // già escapato ?> · <small><?php echo esc_html($r['date']); ?><?php echo $r['edited'] ? ' · modificata' : ''; ?></small>
                             <?php if ($r['tagged']) : ?><br><small>Avvisati via email: <?php echo esc_html(implode(', ', $r['tagged'])); ?></small><?php endif; ?>
                             <p style="white-space:pre-wrap;margin-bottom:0"><?php echo esc_html($r['text']); ?></p>
                         </div>

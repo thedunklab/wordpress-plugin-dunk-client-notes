@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.0 — 2026-10-29
+- **Il team scrive come team**: chi è loggato in WordPress non sceglie più un gruppo del cliente; scrive con l'etichetta del team (Impostazioni → **Nome del team**, di base «DUNK»), con puntine nere e numero giallo. Anche le note del team già scritte passano a questa etichetta.
+- **Gruppo predefinito «Cliente»**: un sito senza gruppi propri usa il gruppo «Cliente» (giallo, modificabile in Impostazioni). Con un solo gruppo il cliente non deve scegliere nulla e il filtro «Solo …» non compare; le note del cliente scritte prima dei gruppi risultano «Cliente».
+
 ## 1.9.2 — 2026-10-29
 - Nel riquadro «Nuova nota» la casella dello screenshot si chiama «Cattura uno screenshot automatico» (non «Allega»): lo fa il plugin, non serve caricare un file.
 

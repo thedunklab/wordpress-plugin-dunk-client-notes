@@ -16,6 +16,13 @@ class Plugin
     public const NOTE  = 'dcn_note';
     public const REPLY = 'dcn_reply';
 
+    /** Gruppo usato quando il sito non ne ha di propri: tutto il cliente insieme, giallo DUNK. */
+    public const DEFAULT_GROUP = ['id' => 'cliente', 'name' => 'Cliente', 'color' => '#fee000'];
+
+    /** Chi è nel team non usa i gruppi del cliente: puntine nere con il numero giallo. */
+    public const TEAM_COLOR = '#1c1c1c';
+    public const TEAM_INK   = '#fde000';
+
     public static function init(): void
     {
         add_action('init', [self::class, 'register_types']);
@@ -91,6 +98,7 @@ class Plugin
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
             'groups' => array_map(static fn ($g) => $g + ['ink' => self::ink($g['color'])], self::groups()),
+            'teamTag' => ['name' => self::team_label(), 'color' => self::TEAM_COLOR, 'ink' => self::TEAM_INK],
             'ready'  => !$team && (bool) self::ready_users(), // lo segnala il cliente: chi è nel team lo riceve
             'autoclose' => (bool) get_option('dcn_autoclose', 1), // chiude il pannello dopo l'invio di una risposta
             'fab'    => ['side' => get_option('dcn_fab_side', 'right') === 'left' ? 'left' : 'right', 'bottom' => (int) get_option('dcn_fab_bottom', 0)], // posizione del pulsante (per non coprire altri widget, es. Iubenda)
@@ -173,7 +181,32 @@ class Plugin
      */
     public static function groups(): array
     {
-        return array_values(array_filter((array) get_option('dcn_groups', []), static fn ($g) => is_array($g) && isset($g['id'], $g['name'], $g['color'])));
+        $list = array_values(array_filter((array) get_option('dcn_groups', []), static fn ($g) => is_array($g) && isset($g['id'], $g['name'], $g['color'])));
+
+        return $list ?: [self::DEFAULT_GROUP];
+    }
+
+    /** Nome con cui scrive chi è nel team (Impostazioni), al posto dei gruppi del cliente. */
+    public static function team_label(): string
+    {
+        return (string) (get_option('dcn_team_label') ?: 'DUNK');
+    }
+
+    /**
+     * Gruppo da mostrare per una nota o una risposta: il team non ha gruppo (ha la sua etichetta); il cliente ha
+     * il suo, oppure «Cliente» se il sito usa solo il gruppo predefinito (anche per le note scritte prima dei gruppi).
+     */
+    public static function group_for(string $stored, string $source): string
+    {
+        if ($source === 'team') {
+            return '';
+        }
+        if ($stored !== '' && self::group($stored)) {
+            return $stored;
+        }
+        $groups = self::groups();
+
+        return count($groups) === 1 && $groups[0]['id'] === self::DEFAULT_GROUP['id'] ? self::DEFAULT_GROUP['id'] : '';
     }
 
     /** Il gruppo con quell'id, oppure null (gruppo cancellato o nessun gruppo). */
@@ -191,6 +224,9 @@ class Plugin
     /** Colore del testo leggibile sopra un colore di sfondo (#rrggbb): quasi nero o bianco. */
     public static function ink(string $hex): string
     {
+        if (strtolower($hex) === self::TEAM_COLOR) {
+            return self::TEAM_INK;
+        }
         [$r, $g, $b] = sscanf(ltrim($hex, '#'), '%02x%02x%02x') + [0, 0, 0];
 
         return (0.299 * $r + 0.587 * $g + 0.114 * $b) > 150 ? '#1a1600' : '#ffffff';
@@ -359,7 +395,7 @@ class Plugin
                 'id'     => $r->ID,
                 'author' => (string) get_post_meta($r->ID, '_dcn_author', true),
                 'source' => (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client',
-                'group'  => (string) get_post_meta($r->ID, '_dcn_group', true),
+                'group'  => self::group_for((string) get_post_meta($r->ID, '_dcn_group', true), (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client'),
                 'kind'   => (string) get_post_meta($r->ID, '_dcn_kind', true), // '' = risposta, altrimenti cambio di stato del team
                 'pending' => self::is_pending((string) get_post_meta($r->ID, '_dcn_contact', true)),
                 'text'   => wp_specialchars_decode($r->post_content, ENT_QUOTES),
@@ -374,7 +410,7 @@ class Plugin
             'n'        => (int) $meta('n'),
             'author'   => (string) $meta('author'),
             'source'   => (string) $meta('source') ?: 'client',
-            'group'    => (string) $meta('group'),
+            'group'    => self::group_for((string) $meta('group'), (string) $meta('source') ?: 'client'),
             'edited'   => (bool) $meta('edited'),
             'involved' => self::involved($note),
             'pending'  => self::is_pending((string) $meta('contact')),

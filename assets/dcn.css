@@ -206,3 +206,8 @@
 .tools-row.sub .count { flex: none; white-space: nowrap; }
 .by-dunk .ver { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .by-dunk .ver b { color: var(--text); font-weight: 600; }
+
+/* team: nero con il giallo DUNK, separato dai gruppi del cliente (bordo giallo per vederlo anche sul pannello scuro) */
+.grp.team { box-shadow: inset 0 0 0 1px var(--accent); }
+.pin.tm { border-color: var(--accent); }
+.num.tm { border-color: var(--accent); }

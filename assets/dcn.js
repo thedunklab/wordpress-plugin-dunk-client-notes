@@ -48,6 +48,15 @@
     const groupOf = (id) => GROUPS.find((g) => g.id === id) || null
     const groupTint = (el, id) => { const g = groupOf(id); if (g) { el.classList.add('g'); el.style.setProperty('--g', g.color); el.style.setProperty('--g-ink', g.ink) } return el }
     const groupChip = (id) => { const g = groupOf(id); return g ? h('span', { class: 'grp', style: `--g:${g.color};--g-ink:${g.ink}` }, g.name) : null }
+    // chi è nel team non ha un gruppo del cliente: ha la sua etichetta (Impostazioni → Nome del team), nera con il giallo DUNK
+    const TEAM = cfg.teamTag || { name: 'DUNK', color: '#1c1c1c', ink: '#fde000' }
+    const teamChip = () => h('span', { class: 'grp team', style: `--g:${TEAM.color};--g-ink:${TEAM.ink}` }, TEAM.name)
+    const tintFor = (el, item) => {
+        if (item.source !== 'team') return groupTint(el, item.group)
+        el.classList.add('g', 'tm'); el.style.setProperty('--g', TEAM.color); el.style.setProperty('--g-ink', TEAM.ink)
+        return el
+    }
+    const chipFor = (item) => (item.source === 'team' ? teamChip() : groupChip(item.group))
 
     /* ---------- radice (Shadow DOM) ---------- */
     const host = h('div', { id: 'dcn-root' })
@@ -253,7 +262,7 @@
         renderPanel()
     }
     // filtro «Solo il mio gruppo» (lo ricorda il browser): vale per l'elenco e per le puntine
-    const onlyMine = () => stored('dcn_only_group') === '1' && !!meGroup()
+    const onlyMine = () => stored('dcn_only_group') === '1' && GROUPS.length > 1 && !!meGroup()
     const shown = (n) => (state.resolved || n.status !== 'resolved') && (!onlyMine() || n.group === meGroup())
     const visibleNotes = () => state.notes.filter(shown)
 
@@ -269,11 +278,11 @@
     const renderPins = () => {
         pinsLayer.replaceChildren(
             ...visibleNotes().map((n) =>
-                groupTint(h('button', {
+                tintFor(h('button', {
                     class: `pin ${n.status}${state.current === n.id && state.view === 'note' ? ' active' : ''}`,
-                    type: 'button', 'data-id': n.id, title: (groupOf(n.group) ? groupOf(n.group).name + ' · ' : '') + n.text.slice(0, 80), 'aria-label': 'Nota ' + n.n,
+                    type: 'button', 'data-id': n.id, title: (n.source === 'team' ? TEAM.name + ' · ' : groupOf(n.group) ? groupOf(n.group).name + ' · ' : '') + n.text.slice(0, 80), 'aria-label': 'Nota ' + n.n,
                     onclick: () => openNote(n.id),
-                }, h('span', {}, n.n)), n.group)
+                }, h('span', {}, n.n)), n)
             )
         )
         placePins()
@@ -285,7 +294,7 @@
         if (show) { state.view = state.view === 'note' ? 'note' : state.view === 'who' ? 'who' : 'list'; load() }
     }
 
-    const numBadge = (n) => groupTint(h('span', { class: `num ${n.status}` }, n.n), n.group)
+    const numBadge = (n) => tintFor(h('span', { class: `num ${n.status}` }, n.n), n)
     const statusBadge = (s) => h('span', { class: `st ${s}` }, STATUS[s])
 
     const renderPanel = () => {
@@ -341,9 +350,10 @@
     const me = () => { try { return JSON.parse(stored('dcn_me') || '{}') } catch { return {} } }
     const setMe = (v) => store('dcn_me', JSON.stringify({ ...me(), ...v }))
     const meContact = () => state.contacts.find((c) => c.id === me().contact) || null
-    const meGroup = () => (groupOf(me().group) ? me().group : '')
+    // con un solo gruppo (es. «Cliente») non si sceglie: è quello. Il team non ha gruppo
+    const meGroup = () => (cfg.team ? '' : groupOf(me().group) ? me().group : GROUPS.length === 1 ? GROUPS[0].id : '')
     // il team scrive col suo utente WordPress: sceglie solo il gruppo (se ci sono gruppi)
-    const identified = () => (cfg.team ? true : !!meContact() && (!GROUPS.length || !!meGroup()))
+    const identified = () => (cfg.team ? true : !!meContact() && !!meGroup())
     const whoFields = () => ({ author: cfg.team ? cfg.user : meContact()?.name || '', contact: cfg.team ? '' : me().contact || '', group: meGroup() })
     // vecchie versioni: il nome scritto a mano, se coincide con una persona confermata, diventa la scelta
     const adoptOldName = () => {
@@ -370,7 +380,7 @@
     const renderWho = (body) => {
         const mine = me().contact
         const people = state.contacts.filter((c) => !c.pending || c.id === mine).sort((a, b) => a.name.localeCompare(b.name, 'it'))
-        const step = state.whoStep || (meContact() && GROUPS.length && !cfg.team ? 'group' : cfg.team ? 'group' : 'name')
+        const step = state.whoStep || (meContact() && GROUPS.length > 1 ? 'group' : 'name')
         const done = () => {
             state.whoStep = ''
             state.view = 'list'
@@ -383,7 +393,7 @@
             body.append(h('p', { class: 'hint-txt' }, cfg.team ? 'Con quale gruppo scrivi? Le tue note avranno il suo colore.' : 'Di che gruppo fai parte? Le tue note avranno il suo colore.'),
                 h('div', { class: 'who-list' }, ...GROUPS.map((g) => h('button', { class: `who g${meGroup() === g.id ? ' on' : ''}`, type: 'button', style: `--g:${g.color};--g-ink:${g.ink}`, onclick: () => { setMe({ group: g.id }); done() } },
                     h('span', { class: 'dot' }), h('b', {}, g.name)))),
-                cfg.team ? h('button', { class: 'btn', type: 'button', onclick: () => { setMe({ group: '' }); done() } }, 'Nessun gruppo') : h('button', { class: 'link-btn', type: 'button', onclick: () => { state.whoStep = 'name'; renderPanel() } }, '← Cambia nome'))
+                h('button', { class: 'link-btn', type: 'button', onclick: () => { state.whoStep = 'name'; renderPanel() } }, '← Cambia nome'))
             return
         }
         if (step === 'new') {
@@ -396,7 +406,7 @@
                     const res = await api('/contacts', { method: 'POST', body: { name: `${first.value.trim()} ${last.value.trim()}`, email: email.value } })
                     state.contacts = res.contacts
                     setMe({ contact: res.id })
-                    state.whoStep = GROUPS.length ? 'group' : ''
+                    state.whoStep = GROUPS.length > 1 ? 'group' : ''
                     if (state.whoStep) renderPanel(); else done()
                 } catch (err) { toast(err.message); add.disabled = false }
             } }, 'Aggiungimi')
@@ -410,7 +420,7 @@
         const filter = people.length > 8 ? h('input', { class: 'who-filter', type: 'search', placeholder: 'Cerca il tuo nome…', 'aria-label': 'Cerca il tuo nome' }) : null
         const list = h('div', { class: 'who-list' }, ...people.map((c) => h('button', { class: `who${c.id === mine ? ' on' : ''}`, type: 'button', 'data-name': c.name.toLowerCase(), onclick: () => {
             setMe({ contact: c.id })
-            if (GROUPS.length) { state.whoStep = 'group'; renderPanel() } else done()
+            if (GROUPS.length > 1) { state.whoStep = 'group'; renderPanel() } else done()
         } }, h('span', { class: 'avatar' }, c.name.trim().charAt(0).toUpperCase()), h('b', {}, c.name), c.pending ? h('span', { class: 'pending' }, 'da confermare') : null)))
         filter?.addEventListener('input', () => list.querySelectorAll('.who').forEach((b) => { b.hidden = !b.dataset.name.includes(filter.value.trim().toLowerCase()) }))
         body.append(...[h('p', { class: 'hint-txt' }, 'Scegli il tuo nome: lo useremo per le tue note e per avvisarti quando vengono chiuse.'),
@@ -420,11 +430,10 @@
 
     /* riga fissa in cima al pannello: con che nome e gruppo si sta scrivendo */
     const whoBar = () => {
-        if (cfg.team && !GROUPS.length) return null
         const c = meContact()
-        return h('div', { class: 'who-bar' }, h('span', {}, 'Scrivi come ', h('b', {}, cfg.team ? `${cfg.user} (team)` : c?.name || '—'), groupChip(meGroup()),
+        return h('div', { class: 'who-bar' }, h('span', {}, 'Scrivi come ', h('b', {}, cfg.team ? cfg.user : c?.name || '—'), cfg.team ? teamChip() : groupChip(meGroup()),
             !cfg.team && c?.pending ? h('span', { class: 'pending' }, 'da confermare') : null),
-        h('button', { class: 'link-btn', type: 'button', onclick: () => { state.view = 'who'; state.whoStep = cfg.team ? 'group' : 'name'; renderPanel() } }, 'Cambia'))
+        cfg.team ? null : h('button', { class: 'link-btn', type: 'button', onclick: () => { state.view = 'who'; state.whoStep = 'name'; renderPanel() } }, 'Cambia'))
     }
 
     /* scelta delle persone esterne da segnalare. Nei moduli di nota e risposta è chiusa finché non la si apre («+ Segnala a qualcuno») */
@@ -464,7 +473,7 @@
                 // filtri come pulsantini uguali a sinistra, conteggio a destra: tutto su una riga
                 h('div', { class: 'filters' },
                     h('button', { class: 'chip', type: 'button', 'aria-pressed': String(!!state.resolved), title: 'Mostra anche le note risolte', onclick: () => { state.resolved = !state.resolved; render() } }, 'Risolte'),
-                    meGroup() ? h('button', { class: 'chip g', type: 'button', style: `--g:${groupOf(meGroup()).color};--g-ink:${groupOf(meGroup()).ink}`, 'aria-pressed': String(onlyMine()), title: 'Mostra solo le note del tuo gruppo, nell’elenco e sulla pagina',
+                    GROUPS.length > 1 && meGroup() ? h('button', { class: 'chip g', type: 'button', style: `--g:${groupOf(meGroup()).color};--g-ink:${groupOf(meGroup()).ink}`, 'aria-pressed': String(onlyMine()), title: 'Mostra solo le note del tuo gruppo, nell’elenco e sulla pagina',
                         onclick: () => { store('dcn_only_group', onlyMine() ? '' : '1'); render() } }, 'Solo ' + groupOf(meGroup()).name) : null),
                 h('span', { class: 'count', title: `${open} apert${open === 1 ? 'a' : 'e'}, ${done} risolt${done === 1 ? 'a' : 'e'}` }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
             ),
@@ -510,7 +519,7 @@
                 h('span', { class: 'txt' }, n.text),
                 h('span', { class: 'item-meta' },
                     h('span', {}, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : ''),
-                    groupChip(n.group),
+                    chipFor(n),
                     state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
                     n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
                     n.status !== 'open' ? statusBadge(n.status) : null)
@@ -576,7 +585,7 @@
 
     // intestazione uguale per nota e risposte: nome, gruppo, «da confermare» (solo per il team), data e «Modifica» a destra
     const whoLine = (item, edit, extra = null) => h('div', { class: 'who-line' },
-        h('span', { class: 'who-name' }, h('b', {}, item.author), item.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null, groupChip(item.group),
+        h('span', { class: 'who-name' }, h('b', {}, item.author), chipFor(item),
             cfg.team && item.pending ? h('span', { class: 'pending', title: 'Si è aggiunto dal sito: confermalo in bacheca → Persone esterne' }, 'da confermare') : null),
         h('span', { class: 'who-date' }, item.date + (item.edited ? ' · modificata' : '')),
         extra, edit)
@@ -745,7 +754,7 @@
         const who = meContact()
         const f = form({ class: 'composer' },
             h('h3', {}, 'Nuova nota'),
-            cfg.team && !GROUPS.length ? null : h('p', { class: 'composer-who' }, 'Come ', h('b', {}, cfg.team ? cfg.user : who?.name || ''), groupChip(meGroup())),
+            h('p', { class: 'composer-who' }, 'Come ', h('b', {}, cfg.team ? cfg.user : who?.name || ''), cfg.team ? teamChip() : groupChip(meGroup())),
             text, tags.el,
             h('label', { class: 'check' }, shot, 'Cattura uno screenshot automatico'),
             h('div', { class: 'row' }, send, h('button', { class: 'btn', type: 'button', onclick: closeComposer }, 'Annulla'))
