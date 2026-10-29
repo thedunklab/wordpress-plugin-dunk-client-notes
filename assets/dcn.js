@@ -306,7 +306,10 @@
     }
 
     const LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700.9 334.8" fill="currentColor" aria-hidden="true"><path d="M140.5,19.1C129,6.4,111.7,0,88.8,0H0v235l64.8-8.8V56.2h7.1c6.2,0,10.9.6,13.9,1.9,3,1.2,5.1,3.7,6.2,7.3,1.1,3.6,1.7,9.1,1.7,16.3v140.6l65.1-8.8-.7-137.8c-.2-25-6.1-43.8-17.6-56.6h0Z"></path> <path d="M102.4,257.6c0,11.5-5.9,17.2-17.6,17.2h-11.2v-38.6l-64.8,8.8v86.8h86.5c26,0,44.6-8,55.8-24s16.7-39.8,16.5-71.5v-12.8c0,0-65.2,8.8-65.2,8.8v25.3h0Z"></path> <polygon points="236 0 173.4 0 173.4 211.5 236 203 236 0"></polygon> <polygon points="267.4 0 267.4 198.8 330 190.3 330 0 267.4 0"></polygon> <path d="M276.2,243c0,10.5-1,18.5-3,24.2s-6.2,8.4-12.7,8.4-10.7-2.9-12.7-8.6c-2-5.7-3-13.7-3-24v-30l-62.6,8.5v24.1c0,29.5,6.4,51.7,19.3,66.7,12.9,15,32.5,22.5,59,22.5s46.1-7.5,59-22.5,19.3-37.2,19.3-66.7v-45.3l-62.5,8.5v34.2h0Z"></path> <polygon points="451.1 331.8 514 331.8 514 176.5 422.5 188.9 451.1 331.8"></polygon> <polygon points="356 331.8 418.9 331.8 418.9 189.4 356 197.9 356 331.8"></polygon> <polygon points="443.1 0 443.1 153.9 413.5 0 347.2 0 347.2 187.9 410.1 179.4 410.1 160.7 413.8 178.9 505.3 166.5 505.3 0 443.1 0"></polygon> <polygon points="657.5 157.1 535 173.7 535 331.8 599 331.8 599 175.9 634.3 331.8 700.9 331.8 657.5 157.2 657.5 157.1"></polygon> <polygon points="684.7 0 619.9 0 589.9 128.9 589.9 0 526.3 0 526.3 163.7 648.8 147.1 684.7 0"></polygon></svg>'
-    const byDunk = () => h('div', { class: 'by-dunk' }, h('a', { class: 'logo', href: 'https://thedunk.it', target: '_blank', rel: 'noopener', 'aria-label': 'DUNK' }, document.createRange().createContextualFragment(LOGO)))
+    // piede del pannello: logo DUNK a sinistra, nome del plugin e versione a destra
+    const byDunk = () => h('div', { class: 'by-dunk' },
+        h('a', { class: 'logo', href: 'https://thedunk.it', target: '_blank', rel: 'noopener', 'aria-label': 'DUNK' }, document.createRange().createContextualFragment(LOGO)),
+        h('span', { class: 'ver' }, 'DUNK Client Notes', cfg.version ? h('b', {}, ' v' + cfg.version) : null))
 
     const USER_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg>'
 

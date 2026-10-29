@@ -45,7 +45,7 @@
 .empty { padding: 28px 14px; color: var(--muted); text-align: center; }
 
 /* firma */
-.by-dunk { display: flex; align-items: center; justify-content: center; padding: 10px 14px; border-top: 1px solid var(--line); background: rgba(18, 18, 18, .92); }
+.by-dunk { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); background: rgba(18, 18, 18, .92); }
 .by-dunk .logo { display: inline-flex; align-items: center; padding: 2px 4px; color: var(--accent); text-decoration: none; transition: opacity .2s; }
 .by-dunk .logo svg { display: block; width: auto; height: 15px; }
 .by-dunk .logo:hover, .by-dunk .logo:focus-visible { opacity: .65; }
@@ -204,3 +204,5 @@
 .filters .chip { flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip[aria-pressed='true']:not(.g)::before { content: '✓ '; }
 .tools-row.sub .count { flex: none; white-space: nowrap; }
+.by-dunk .ver { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.by-dunk .ver b { color: var(--text); font-weight: 600; }

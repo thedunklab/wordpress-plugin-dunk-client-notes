@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DUNK Client Notes
  * Description: Note e commenti del cliente direttamente sulle pagine dello staging: puntine sull'elemento, screenshot automatico, risposte e stato. Da tenere attivo solo in staging.
- * Version:     1.9.0
+ * Version:     1.9.1
  * Author:      DUNK Agency
  * Author URI:  https://thedunk.it
  * Text Domain: dunk-client-notes
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('DCN_VERSION', '1.9.0');
+define('DCN_VERSION', '1.9.1');
 define('DCN_FILE', __FILE__);
 define('DCN_DIR', plugin_dir_path(__FILE__));
 define('DCN_URL', plugin_dir_url(__FILE__));

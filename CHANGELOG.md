@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.1 — 2026-10-29
+- Nel piede del pannello il logo DUNK è a sinistra e a destra compaiono il nome del plugin e la versione installata.
+
 ## 1.9.0 — 2026-10-29
 - **«Chi sei?» una volta sola**: alla prima apertura del pannello si sceglie il proprio nome dall'elenco delle persone (non più un testo libero), poi il gruppo. Il browser lo ricorda; in cima al pannello «Scrivi come … · gruppo — Cambia». Nome e gruppo spariscono dai moduli di nota e risposta.
 - **Non sono in elenco**: chi non c'è si aggiunge con nome, cognome ed email e può scrivere subito; resta «da confermare» finché il team non lo conferma o lo rifiuta in **Note cliente → Persone esterne** (avviso in bacheca, contatore nel menu, email al team). Anche le persone aggiunte dalla rubrica del pannello da chi non è nel team restano da confermare.

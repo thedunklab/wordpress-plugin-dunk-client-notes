@@ -86,6 +86,7 @@ class Plugin
             'nonce'  => wp_create_nonce('wp_rest'),
             'token'  => self::token(),
             'label'  => self::label(),
+            'version' => DCN_VERSION,
             'team'   => $team,
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
