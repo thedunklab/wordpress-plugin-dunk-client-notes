@@ -252,7 +252,10 @@
         renderPins()
         renderPanel()
     }
-    const visibleNotes = () => state.notes.filter((n) => state.resolved || n.status !== 'resolved')
+    // filtro «Solo il mio gruppo» (lo ricorda il browser): vale per l'elenco e per le puntine
+    const onlyMine = () => stored('dcn_only_group') === '1' && !!meGroup()
+    const shown = (n) => (state.resolved || n.status !== 'resolved') && (!onlyMine() || n.group === meGroup())
+    const visibleNotes = () => state.notes.filter(shown)
 
     const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z"/></svg>'
     const renderFab = () => {
@@ -438,7 +441,7 @@
     }
 
     const toolbar = () => {
-        const src = state.tab === 'all' ? (state.all || []) : state.notes
+        const src = (state.tab === 'all' ? (state.all || []) : state.notes).filter((n) => !onlyMine() || n.group === meGroup())
         const open = src.filter((n) => n.status !== 'resolved').length
         const done = src.length - open
         return h('div', { class: 'tools' },
@@ -455,7 +458,10 @@
                 )
             ),
             h('div', { class: 'tools-row sub' },
-                h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Mostra risolte'),
+                h('div', { class: 'tools-left' },
+                    h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Mostra risolte'),
+                    meGroup() ? h('button', { class: 'chip g', type: 'button', style: `--g:${groupOf(meGroup()).color};--g-ink:${groupOf(meGroup()).ink}`, 'aria-pressed': String(onlyMine()), title: 'Mostra solo le note del tuo gruppo, nell’elenco e sulla pagina',
+                        onclick: () => { store('dcn_only_group', onlyMine() ? '' : '1'); render() } }, 'Solo ' + groupOf(meGroup()).name) : null),
                 h('span', { class: 'count' }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
             ),
             readyBox()
@@ -488,9 +494,10 @@
 
     const renderList = (body) => {
         const src = state.tab === 'all' ? (state.all || []) : state.notes
-        const list = src.filter((n) => state.resolved || n.status !== 'resolved').slice().sort((a, b) => b.id - a.id)
+        const list = src.filter(shown).slice().sort((a, b) => b.id - a.id)
         if (!list.length) {
-            body.append(h('div', { class: 'empty' }, state.tab === 'all' ? 'Nessuna nota nel sito.' : 'Nessuna nota su questa pagina. Premi «Nuova nota», poi clicca sul punto da commentare.'))
+            body.append(h('div', { class: 'empty' }, onlyMine() ? `Nessuna nota del gruppo ${groupOf(meGroup()).name}${state.tab === 'all' ? ' nel sito' : ' su questa pagina'}. Togli il filtro «Solo ${groupOf(meGroup()).name}» per vederle tutte.`
+                : state.tab === 'all' ? 'Nessuna nota nel sito.' : 'Nessuna nota su questa pagina. Premi «Nuova nota», poi clicca sul punto da commentare.'))
             return
         }
         list.forEach((n) => body.append(h('button', { class: 'item', type: 'button', onclick: () => (n.path === path ? openNote(n.id) : (location.href = n.url ? `${n.url.split('#')[0]}#dcn-${n.id}` : `${n.path}#dcn-${n.id}`)) },
