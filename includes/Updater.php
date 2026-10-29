@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Aggiornamenti dalla repo GitHub (privata) direttamente dalla bacheca di WordPress:
+ * Aggiornamenti dalla repo GitHub (pubblica, nessun token) direttamente dalla bacheca di WordPress:
  * l'ultimo tag semver è la versione disponibile, il suo CHANGELOG.md è il registro delle novità.
  */
 final class Updater
@@ -24,8 +24,10 @@ final class Updater
         }
         add_filter('pre_set_site_transient_update_plugins', [self::class, 'inject']);
         add_filter('plugins_api', [self::class, 'details'], 20, 3);
-        add_filter('http_request_args', [self::class, 'auth'], 10, 2);
         add_filter('upgrader_source_selection', [self::class, 'rename'], 10, 4);
+        if (get_option('dcn_github_token') !== false) {
+            delete_option('dcn_github_token'); // token delle versioni ≤ 1.6, quando la repo era privata
+        }
     }
 
     /** Dentro un checkout git (sottomodulo) gli aggiornamenti da bacheca sono spenti. */
@@ -34,17 +36,9 @@ final class Updater
         return file_exists(DCN_DIR . '.git');
     }
 
-    public static function token(): string
-    {
-        return defined('DUNK_NOTES_GITHUB_TOKEN') ? (string) DUNK_NOTES_GITHUB_TOKEN : (string) get_option('dcn_github_token', '');
-    }
-
     private static function get(string $path, string $accept = 'application/vnd.github+json'): array
     {
         $headers = ['Accept' => $accept, 'User-Agent' => 'dunk-client-notes'];
-        if (self::token() !== '') {
-            $headers['Authorization'] = 'Bearer ' . self::token();
-        }
         $res = wp_remote_get('https://api.github.com' . $path, ['headers' => $headers, 'timeout' => 12]);
         if (is_wp_error($res)) {
             return [0, $res->get_error_message()];
@@ -64,7 +58,8 @@ final class Updater
         if ($code !== 200) {
             $info['error'] = match (true) {
                 $code === 0 => 'Connessione a GitHub non riuscita: ' . $body,
-                in_array($code, [401, 403, 404], true) => 'GitHub non ha accettato il token (codice ' . $code . '): ' . (self::token() === '' ? 'nessun token impostato.' : 'controlla che sia valido e abbia accesso in lettura alla repo.'),
+                in_array($code, [403, 429], true) => 'GitHub ha limitato le richieste da questo server (codice ' . $code . '): riprova tra un\'ora.',
+                $code === 404 => 'Repo del plugin non trovata su GitHub (codice 404).',
                 default => 'Risposta inattesa da GitHub (codice ' . $code . ').',
             };
             set_transient(self::CACHE, $info, 15 * MINUTE_IN_SECONDS);
@@ -143,16 +138,6 @@ final class Updater
                 'changelog' => self::markdown($md),
             ],
         ];
-    }
-
-    /** Il download dalla repo privata richiede il token. */
-    public static function auth(array $args, string $url): array
-    {
-        if (self::token() !== '' && str_starts_with($url, 'https://api.github.com/repos/' . self::REPO . '/zipball/')) {
-            $args['headers']['Authorization'] = 'Bearer ' . self::token();
-            $args['headers']['Accept'] = 'application/vnd.github+json';
-        }
-        return $args;
     }
 
     /** Lo zip di GitHub contiene una cartella «owner-repo-hash»: la rinomina in quella del plugin. */

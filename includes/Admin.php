@@ -91,7 +91,6 @@ class Admin
         register_setting('dcn', 'dcn_smtp_from', ['type' => 'string', 'sanitize_callback' => 'sanitize_email']);
         register_setting('dcn', 'dcn_smtp_name', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
         register_setting('dcn', 'dcn_autoclose', ['type' => 'boolean', 'sanitize_callback' => static fn ($v) => $v ? 1 : 0]);
-        register_setting('dcn', 'dcn_github_token', ['type' => 'string', 'sanitize_callback' => static fn ($v) => trim((string) $v) !== '' ? trim((string) $v) : (string) get_option('dcn_github_token', '')]);
         register_setting('dcn', 'dcn_fab_side', ['type' => 'string', 'sanitize_callback' => static fn ($v) => $v === 'left' ? 'left' : 'right']);
         register_setting('dcn', 'dcn_fab_bottom', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => max(0, min(400, (int) $v))]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
@@ -245,17 +244,6 @@ class Admin
                             <p><input type="password" name="dcn_smtp_pass" class="regular-text" placeholder="<?php echo get_option('dcn_smtp_pass') ? '•••••••• (salvata: lascia vuoto per non cambiarla)' : 'Password SMTP'; ?>" autocomplete="new-password"></p>
                             <p><input type="email" name="dcn_smtp_from" class="regular-text" placeholder="Email mittente (es. note@dunklab.it)" value="<?php echo esc_attr((string) get_option('dcn_smtp_from', '')); ?>"> <input type="text" name="dcn_smtp_name" class="regular-text" placeholder="Nome mittente" value="<?php echo esc_attr((string) get_option('dcn_smtp_name', '')); ?>"></p>
                             <p class="description"><?php echo Mail::ready() ? '<strong>SMTP attivo.</strong>' : 'SMTP non attivo (servono host, utente e password).'; ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Aggiornamenti</th>
-                        <td>
-                            <?php if (defined('DUNK_NOTES_GITHUB_TOKEN')) : ?>
-                                <p class="description" style="margin-top:0">Token impostato da <code>DUNK_NOTES_GITHUB_TOKEN</code> in wp-config.php.</p>
-                            <?php else : ?>
-                                <p><input type="password" name="dcn_github_token" class="regular-text" placeholder="<?php echo get_option('dcn_github_token') ? '•••••••• (salvato: lascia vuoto per non cambiarlo)' : 'Token GitHub (sola lettura)'; ?>" autocomplete="new-password"></p>
-                                <p class="description">Serve per aggiornare il plugin da questa bacheca (Note cliente → Novità). È un token GitHub con accesso in <strong>sola lettura</strong> alla repo del plugin, uguale per tutti i siti.</p>
-                            <?php endif; ?>
                         </td>
                     </tr>
                 </table>

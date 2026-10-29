@@ -22,9 +22,8 @@ cd - && git add wp-content/plugins/dunk-client-notes && git commit -m "Aggiorna 
 Poi attiva il plugin e, solo sullo **staging**, accendilo in Note cliente → Impostazioni. Ogni sito ha le sue impostazioni (nome progetto, destinatari, SMTP, persone esterne).
 
 ## Installazione e aggiornamenti senza git (siti dove i plugin non sono versionati)
-1. **Prima installazione**: scarica lo zip dell'ultima versione (tag `vX.Y.Z` → «Download ZIP», oppure `git archive --prefix=dunk-client-notes/ -o dunk-client-notes.zip vX.Y.Z`) e caricalo da Plugin → Aggiungi → Carica plugin. La cartella deve chiamarsi `dunk-client-notes`.
-2. Inserisci il **token GitHub** (sola lettura sulla repo del plugin) in Note cliente → Impostazioni → Aggiornamenti, oppure in `wp-config.php`: `define('DUNK_NOTES_GITHUB_TOKEN', '…');`.
-3. Da lì in poi le nuove versioni compaiono tra gli aggiornamenti dei plugin (controllo ogni 12 ore, o «Controlla ora» in Note cliente → Novità). Per averle in automatico: «Attiva aggiornamenti automatici» sulla riga del plugin.
+1. **Prima installazione**: scarica lo zip dell'ultima versione da DUNK Tools (pagina *DUNK Client Notes*, già con la cartella giusta) oppure con `git archive --prefix=dunk-client-notes/ -o dunk-client-notes.zip vX.Y.Z`, e caricalo da Plugin → Aggiungi → Carica plugin. La cartella deve chiamarsi `dunk-client-notes` (lo zip «Download ZIP» di GitHub ha un altro nome di cartella).
+2. Da lì in poi le nuove versioni compaiono tra gli aggiornamenti dei plugin (controllo ogni 12 ore, o «Controlla ora» in Note cliente → Novità). Per averle in automatico: «Attiva aggiornamenti automatici» sulla riga del plugin. La repo è pubblica: non serve nessun token.
 
 Se un progetto usa il sottomodulo git, gli aggiornamenti da bacheca sono spenti (decide git). Attenzione: un `deploy` che copia il sottomodulo sullo staging riporta il plugin alla versione fissata nel progetto.
 

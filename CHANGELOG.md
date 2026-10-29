@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0 — 2026-10-29
+- Aggiornamenti da bacheca senza token: la repo del plugin ora è pubblica. Tolto il campo **Impostazioni → Aggiornamenti** e la costante `DUNK_NOTES_GITHUB_TOKEN`; il token salvato dalle versioni precedenti viene cancellato.
+- Messaggi più chiari se GitHub limita le richieste o non trova la repo.
+
 ## 1.6.0 — 2026-10-28
 - Lo screenshot delle nuove note mostra la puntina numerata (stessa forma e colori di quella sul sito) con la punta nel punto indicato dal cliente, al posto del cerchio: se le puntine si spostano, si capisce comunque a cosa si riferiva la nota. Le note già salvate restano com'erano.
 
@@ -31,7 +35,7 @@ Ancoraggio robusto delle note agli elementi della pagina.
 - Il team, aprendo una pagina, aggiorna l'ancoraggio delle note vecchie senza impronta e di quelle ritrovate altrove.
 
 ## 1.1.0 — 2026-10-28
-Prima versione estratta dal progetto Uripyr D.
+Prima versione, estratta da un progetto cliente.
 - Avviso «Note pronte» per pagina (una email agli utenti WordPress scelti), con riquadro nel pannello del cliente.
 - Invio email via SMTP (es. MailerSend) con email di prova.
 - Email HTML e pannello nello stile DUNK Tools (tema nero con dots).
