@@ -747,7 +747,7 @@
             h('h3', {}, 'Nuova nota'),
             cfg.team && !GROUPS.length ? null : h('p', { class: 'composer-who' }, 'Come ', h('b', {}, cfg.team ? cfg.user : who?.name || ''), groupChip(meGroup())),
             text, tags.el,
-            h('label', { class: 'check' }, shot, 'Allega uno screenshot della pagina'),
+            h('label', { class: 'check' }, shot, 'Cattura uno screenshot automatico'),
             h('div', { class: 'row' }, send, h('button', { class: 'btn', type: 'button', onclick: closeComposer }, 'Annulla'))
         )
         const w = 320

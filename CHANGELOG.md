@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.2 — 2026-10-29
+- Nel riquadro «Nuova nota» la casella dello screenshot si chiama «Cattura uno screenshot automatico» (non «Allega»): lo fa il plugin, non serve caricare un file.
+
 ## 1.9.1 — 2026-10-29
 - Nel piede del pannello il logo DUNK è a sinistra e a destra compaiono il nome del plugin e la versione installata.
 
