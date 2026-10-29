@@ -458,11 +458,12 @@
                 )
             ),
             h('div', { class: 'tools-row sub' },
-                h('div', { class: 'tools-left' },
-                    h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: state.resolved || false, onchange: (e) => { state.resolved = e.target.checked; render() } }), 'Mostra risolte'),
+                // filtri come pulsantini uguali a sinistra, conteggio a destra: tutto su una riga
+                h('div', { class: 'filters' },
+                    h('button', { class: 'chip', type: 'button', 'aria-pressed': String(!!state.resolved), title: 'Mostra anche le note risolte', onclick: () => { state.resolved = !state.resolved; render() } }, 'Risolte'),
                     meGroup() ? h('button', { class: 'chip g', type: 'button', style: `--g:${groupOf(meGroup()).color};--g-ink:${groupOf(meGroup()).ink}`, 'aria-pressed': String(onlyMine()), title: 'Mostra solo le note del tuo gruppo, nell’elenco e sulla pagina',
                         onclick: () => { store('dcn_only_group', onlyMine() ? '' : '1'); render() } }, 'Solo ' + groupOf(meGroup()).name) : null),
-                h('span', { class: 'count' }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
+                h('span', { class: 'count', title: `${open} apert${open === 1 ? 'a' : 'e'}, ${done} risolt${done === 1 ? 'a' : 'e'}` }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
             ),
             readyBox()
         )

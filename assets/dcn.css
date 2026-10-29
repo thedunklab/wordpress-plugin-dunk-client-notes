@@ -200,4 +200,7 @@
 .composer-who { margin: 0; color: var(--muted); font-size: 12px; }
 .composer-who b { color: var(--text); }
 .reply-form { margin-top: 12px; }
-.tools-left { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.filters { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.filters .chip { flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip[aria-pressed='true']:not(.g)::before { content: '✓ '; }
+.tools-row.sub .count { flex: none; white-space: nowrap; }

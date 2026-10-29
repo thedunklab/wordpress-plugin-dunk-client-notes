@@ -3,7 +3,7 @@
 ## 1.9.0 — 2026-10-29
 - **«Chi sei?» una volta sola**: alla prima apertura del pannello si sceglie il proprio nome dall'elenco delle persone (non più un testo libero), poi il gruppo. Il browser lo ricorda; in cima al pannello «Scrivi come … · gruppo — Cambia». Nome e gruppo spariscono dai moduli di nota e risposta.
 - **Non sono in elenco**: chi non c'è si aggiunge con nome, cognome ed email e può scrivere subito; resta «da confermare» finché il team non lo conferma o lo rifiuta in **Note cliente → Persone esterne** (avviso in bacheca, contatore nel menu, email al team). Anche le persone aggiunte dalla rubrica del pannello da chi non è nel team restano da confermare.
-- **Filtro «Solo il mio gruppo»** accanto a «Mostra risolte»: mostra nell'elenco e sulla pagina solo le note del proprio gruppo (il browser lo ricorda).
+- **Filtri** sotto «Nuova nota», su una riga con il conteggio: «Risolte» (mostra anche le note risolte) e «Solo …» con il proprio gruppo, che mostra nell'elenco e sulla pagina solo le note del gruppo (il browser lo ricorda).
 - **Niente invio con Invio**: i moduli partono solo dal pulsante, spento finché il testo è vuoto; nelle aree di testo Invio va a capo.
 - Modulo di risposta più semplice: testo → «+ Segnala a qualcuno» (chiuso finché non lo apri) → Rispondi.
 - Scheda della nota e risposte con la stessa intestazione: nome, gruppo, data, «Modifica» a destra; per il team i pulsanti di stato restano subito sotto la nota.
