@@ -94,6 +94,37 @@ class Admin
         register_setting('dcn', 'dcn_fab_side', ['type' => 'string', 'sanitize_callback' => static fn ($v) => $v === 'left' ? 'left' : 'right']);
         register_setting('dcn', 'dcn_fab_bottom', ['type' => 'integer', 'sanitize_callback' => static fn ($v) => max(0, min(400, (int) $v))]);
         register_setting('dcn', 'dcn_label', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
+        register_setting('dcn', 'dcn_groups', ['type' => 'array', 'sanitize_callback' => [self::class, 'sanitize_groups']]);
+    }
+
+    /** Righe del modulo «Gruppi di lavoro» → [{id, name, color}]. Le righe senza nome o segnate «Rimuovi» si scartano; l'id resta stabile. */
+    public static function sanitize_groups($rows): array
+    {
+        $out = [];
+        $ids = [];
+        foreach ((array) $rows as $row) {
+            $name  = mb_substr(trim(sanitize_text_field((string) ($row['name'] ?? ''))), 0, 40);
+            $color = sanitize_hex_color((string) ($row['color'] ?? '')) ?: '#fee000';
+            if ($name === '' || !empty($row['remove']) || count($out) >= 20) {
+                continue;
+            }
+            $id = sanitize_key((string) ($row['id'] ?? ''));
+            if ($id === '' || isset($ids[$id])) {
+                $id = substr(sanitize_key(sanitize_title($name)), 0, 24) . '-' . strtolower(wp_generate_password(4, false));
+            }
+            $ids[$id] = true;
+            $out[]    = ['id' => $id, 'name' => $name, 'color' => strtolower($color)];
+        }
+
+        return $out;
+    }
+
+    /** Etichetta colorata del gruppo (bacheca). */
+    private static function group_badge(string $id): string
+    {
+        $g = $id !== '' ? Plugin::group($id) : null;
+
+        return $g ? ' <span style="display:inline-block;padding:2px 9px;border-radius:99px;background:' . esc_attr($g['color']) . ';color:' . esc_attr(Plugin::ink($g['color'])) . ';font-size:11px;font-weight:700;line-height:1.4;vertical-align:middle">' . esc_html($g['name']) . '</span>' : '';
     }
 
     /** Rubrica delle persone esterne al team (le stesse del pannello sul sito): elenco, aggiunta e rimozione. */
@@ -207,6 +238,23 @@ class Admin
                             </select>
                             <input type="number" name="dcn_fab_bottom" class="small-text" min="0" max="400" value="<?php echo esc_attr((string) (int) get_option('dcn_fab_bottom', 0)); ?>"> px dal bordo basso
                             <p class="description">Se un altro widget fisso (es. l'icona preferenze di Iubenda, la chat) copre il pulsante «Note», spostalo di lato o alzalo. 0 = posizione standard (20 px).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Gruppi di lavoro</th>
+                        <td>
+                            <p class="description" style="margin-top:0">I gruppi di chi commenta (es. Marketing, Regolatorio, Medico): chi scrive una nota sceglie il suo gruppo e la puntina prende quel colore. Senza gruppi le puntine restano gialle DUNK. Lo stato si riconosce comunque: <em>in lavorazione</em> ha un anello bianco, <em>risolta</em> la spunta verde.</p>
+                            <table class="dcn-groups" style="margin-top:8px;border-collapse:collapse">
+                                <?php $rows = Plugin::groups(); $rows[] = ['id' => '', 'name' => '', 'color' => '#7c6cf0'];
+                                foreach ($rows as $i => $g) : ?>
+                                    <tr>
+                                        <td style="padding:0 8px 6px 0"><input type="hidden" name="dcn_groups[<?php echo (int) $i; ?>][id]" value="<?php echo esc_attr($g['id']); ?>"><input type="text" name="dcn_groups[<?php echo (int) $i; ?>][name]" class="regular-text" style="width:220px" maxlength="40" placeholder="<?php echo $g['id'] === '' ? 'Nuovo gruppo (es. Regolatorio)' : ''; ?>" value="<?php echo esc_attr($g['name']); ?>"></td>
+                                        <td style="padding:0 8px 6px 0"><input type="color" name="dcn_groups[<?php echo (int) $i; ?>][color]" value="<?php echo esc_attr($g['color']); ?>" style="width:44px;height:30px;padding:0 2px"></td>
+                                        <td style="padding:0 0 6px"><?php if ($g['id'] !== '') : ?><label><input type="checkbox" name="dcn_groups[<?php echo (int) $i; ?>][remove]" value="1"> Rimuovi</label><?php endif; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </table>
+                            <p class="description">Per aggiungerne altri salva: si libera una nuova riga vuota. Rimuovendo un gruppo, le sue note restano ma tornano gialle.</p>
                         </td>
                     </tr>
                     <tr>
@@ -387,7 +435,7 @@ class Admin
                         <td><a href="<?php echo esc_url(admin_url('admin.php?page=dcn-notes&note=' . $n['id'])); ?>"><strong><?php echo esc_html(wp_trim_words($n['text'], 18)); ?></strong></a>
                             <?php if ($n['replies']) : ?><br><small><?php echo count($n['replies']); ?> rispost<?php echo count($n['replies']) === 1 ? 'a' : 'e'; ?></small><?php endif; ?></td>
                         <td><code><?php echo esc_html($n['path']); ?></code></td>
-                        <td><?php echo esc_html($n['author']); ?><?php echo $n['source'] === 'team' ? ' <small>(team)</small>' : ''; ?></td>
+                        <td><?php echo esc_html($n['author']); ?><?php echo $n['source'] === 'team' ? ' <small>(team)</small>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?></td>
                         <td><?php echo self::badge($n['status']); // già escapato ?></td>
                         <td><?php echo esc_html($n['date']); ?></td>
                     </tr>
@@ -424,11 +472,11 @@ class Admin
         <div class="wrap dcn-wrap">
             <h1 class="wp-heading-inline">Nota #<?php echo (int) $n['n']; ?></h1>
             <a href="<?php echo esc_url(admin_url('admin.php?page=dcn-notes')); ?>" class="page-title-action">← Tutte le note</a>
-            <?php if (isset($_GET['done'])) : ?><div class="notice notice-success is-dismissible"><p>Fatto.</p></div><?php endif; ?>
+            <?php if (isset($_GET['done'])) : $sent = (int) ($_GET['sent'] ?? 0); ?><div class="notice notice-success is-dismissible"><p>Fatto.<?php echo $sent ? ' Email inviata a ' . ($sent === 1 ? '1 persona' : $sent . ' persone') . '.' : ''; ?></p></div><?php endif; ?>
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;margin-top:16px;max-width:1200px">
                 <div>
                     <div class="postbox" style="padding:16px 20px">
-                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['source'] === 'team' ? ' (team)' : ''; ?> · <?php echo esc_html($n['date']); ?></p>
+                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['source'] === 'team' ? ' (team)' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
                         <p style="font-size:15px;white-space:pre-wrap"><?php echo esc_html($n['text']); ?></p>
                         <p><a class="button button-primary" href="<?php echo esc_url($view); ?>" target="_blank" rel="noopener">Apri la pagina nel punto della nota</a> <code><?php echo esc_html($n['path']); ?></code></p>
                         <?php if ($n['shot']) : ?><p><a href="<?php echo esc_url($n['shot']); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($n['shot']); ?>" alt="Screenshot" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:8px"></a></p><?php endif; ?>
@@ -436,27 +484,37 @@ class Admin
                     <h2>Conversazione</h2>
                     <?php foreach ($n['replies'] as $r) : ?>
                         <div class="postbox" style="padding:10px 16px;<?php echo $r['source'] === 'team' ? 'border-left:4px solid #fee000' : ''; ?>">
-                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?> · <small><?php echo esc_html($r['date']); ?></small>
+                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?><?php echo self::group_badge($r['group']); // già escapato ?> · <small><?php echo esc_html($r['date']); ?><?php echo $r['edited'] ? ' · modificata' : ''; ?></small>
+                            <?php if ($r['tagged']) : ?><br><small>Avvisati via email: <?php echo esc_html(implode(', ', $r['tagged'])); ?></small><?php endif; ?>
                             <p style="white-space:pre-wrap;margin-bottom:0"><?php echo esc_html($r['text']); ?></p>
                         </div>
                     <?php endforeach; ?>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <?php wp_nonce_field('dcn_reply_' . $n['id']); ?>
                         <input type="hidden" name="action" value="dcn_reply"><input type="hidden" name="note" value="<?php echo (int) $n['id']; ?>">
-                        <textarea name="text" rows="4" class="large-text" placeholder="Rispondi al cliente… (facoltativo se la nota è «Risolta» o «In lavorazione»: invia solo lo stato)"></textarea>
+                        <textarea name="text" rows="4" class="large-text" placeholder="Rispondi al cliente…" required></textarea>
                         <p><button class="button button-primary">Invia risposta</button></p>
                     </form>
                 </div>
                 <div>
                     <div class="postbox" style="padding:12px 16px">
                         <h3 style="margin-top:0">Stato</h3>
-                        <?php foreach (self::STATUS_LABEL as $k => $label) : ?>
-                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline">
-                                <?php wp_nonce_field('dcn_status_' . $n['id']); ?>
-                                <input type="hidden" name="action" value="dcn_status"><input type="hidden" name="note" value="<?php echo (int) $n['id']; ?>"><input type="hidden" name="status" value="<?php echo esc_attr($k); ?>">
-                                <button class="button <?php echo $n['status'] === $k ? 'button-primary' : ''; ?>"><?php echo esc_html($label); ?></button>
-                            </form>
-                        <?php endforeach; ?>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('dcn_status_' . $n['id']); ?>
+                            <input type="hidden" name="action" value="dcn_status"><input type="hidden" name="note" value="<?php echo (int) $n['id']; ?>">
+                            <?php $people = Plugin::contacts(); if ($people) : ?>
+                                <p style="margin:0 0 6px"><strong>Avvisa via email</strong> <span class="description">(per «In lavorazione» e «Risolta»)</span></p>
+                                <?php foreach ($people as $c) : ?>
+                                    <label style="display:block;margin:0 0 4px"><input type="checkbox" name="notify[]" value="<?php echo esc_attr($c['id']); ?>" <?php checked(in_array($c['id'], $n['involved'], true)); ?>> <?php echo esc_html($c['name']); ?> <span class="description">· <?php echo esc_html($c['email']); ?></span></label>
+                                <?php endforeach; ?>
+                                <textarea name="text" rows="2" class="large-text" placeholder="Messaggio (facoltativo)" style="margin:6px 0 8px"></textarea>
+                            <?php else : ?>
+                                <p class="description" style="margin:0 0 8px">Per avvisare qualcuno via email quando la nota viene chiusa, aggiungilo in <a href="<?php echo esc_url(admin_url('admin.php?page=dcn-people')); ?>">Persone esterne</a>.</p>
+                            <?php endif; ?>
+                            <?php foreach (self::STATUS_LABEL as $k => $label) : ?>
+                                <button class="button <?php echo $n['status'] === $k ? 'button-primary' : ''; ?>" name="status" value="<?php echo esc_attr($k); ?>"><?php echo esc_html($label); ?></button>
+                            <?php endforeach; ?>
+                        </form>
                     </div>
                     <div class="postbox" style="padding:12px 16px">
                         <h3 style="margin-top:0">Dettagli</h3>
@@ -514,10 +572,12 @@ class Admin
     {
         $id     = self::guard('dcn_status');
         $status = sanitize_key((string) ($_POST['status'] ?? ''));
+        $sent   = [];
         if (isset(self::STATUS_LABEL[$status])) {
-            update_post_meta($id, '_dcn_status', $status);
+            $text = mb_substr(trim(sanitize_textarea_field(wp_unslash((string) ($_POST['text'] ?? '')))), 0, 2000);
+            $sent = Plugin::change_status(get_post($id), $status, array_map('strval', (array) wp_unslash($_POST['notify'] ?? [])), $text);
         }
-        wp_safe_redirect(admin_url('admin.php?page=dcn-notes&note=' . $id . '&done=1'));
+        wp_safe_redirect(admin_url('admin.php?page=dcn-notes&note=' . $id . '&done=1' . ($sent ? '&sent=' . count($sent) : '')));
         exit;
     }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.0 — 2026-10-29
+- **Gruppi di lavoro** con colore (Impostazioni → Gruppi di lavoro): chi scrive sceglie il gruppo, la puntina sul sito e quella nello screenshot prendono il suo colore. Lo stato si vede da un segno: anello bianco per «In lavorazione», spunta verde per «Risolta».
+- **Correzione di note e risposte** già inviate, solo finché la nota è aperta: chi le ha scritte dallo stesso browser, il team sempre. Il testo corretto è segnato «modificata».
+- **Avviso alla chiusura**: mettendo una nota «In lavorazione» o «Risolta» il team sceglie chi avvisare via email tra le persone della rubrica (già proposti l'autore e chi era stato segnalato) e può aggiungere un messaggio. Prima l'email partiva solo verso chi era stato segnalato a mano, e di solito non arrivava a nessuno.
+- Il campo nome suggerisce le persone della rubrica: così l'autore della nota è collegato alla sua email.
+- **Screenshot** fatto nel momento del clic sull'elemento, non all'invio. Header fissi e menu sticky compaiono dove si vedevano: prima finivano fuori dall'immagine e lasciavano in alto una fascia vuota sempre uguale.
+- Campi del riquadro «Nuova nota» con lo stesso stile del pannello.
+
 ## 1.7.0 — 2026-10-29
 - Aggiornamenti da bacheca senza token: la repo del plugin ora è pubblica. Tolto il campo **Impostazioni → Aggiornamenti** e la costante `DUNK_NOTES_GITHUB_TOKEN`; il token salvato dalle versioni precedenti viene cancellato.
 - Messaggi più chiari se GitHub limita le richieste o non trova la repo.

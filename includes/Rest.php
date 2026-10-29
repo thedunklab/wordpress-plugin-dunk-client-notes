@@ -40,6 +40,9 @@ class Rest
         register_rest_route(self::NS, '/notes/(?P<id>\d+)/status', [
             ['methods' => 'POST', 'callback' => [self::class, 'status'], 'permission_callback' => static fn () => Plugin::enabled() && current_user_can('edit_posts')],
         ]);
+        register_rest_route(self::NS, '/items/(?P<id>\d+)', [
+            ['methods' => 'POST', 'callback' => [self::class, 'edit'], 'permission_callback' => [self::class, 'can_use']],
+        ]);
     }
 
     public static function can_use(\WP_REST_Request $r): bool
@@ -121,11 +124,15 @@ class Rest
             'py'       => max(0, (float) $r->get_param('py')),
             'vw'       => (int) $r->get_param('vw'),
             'ua'       => mb_substr(sanitize_text_field((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 200),
+            'group'    => self::group_id($r),
+            'contact'  => self::contact_id($r),
         ];
         foreach ($meta as $k => $v) {
             update_post_meta($id, '_dcn_' . $k, $v);
         }
-        if ($shot = self::save_shot((string) $r->get_param('screenshot'), $n, (float) $r->get_param('shot_fx'), (float) $r->get_param('shot_fy'))) {
+        $key = self::key($id);
+        $pin = Plugin::group($meta['group'])['color'] ?? '';
+        if ($shot = self::save_shot((string) $r->get_param('screenshot'), $n, (float) $r->get_param('shot_fx'), (float) $r->get_param('shot_fy'), $pin)) {
             update_post_meta($id, '_dcn_shot', $shot);
         }
 
@@ -139,7 +146,7 @@ class Rest
 
         self::tag($r, get_post($id), $id, $author, $text, 'note');
 
-        return new \WP_REST_Response(Plugin::format(get_post($id)), 201);
+        return new \WP_REST_Response(Plugin::format(get_post($id)) + ['key' => $key], 201);
     }
 
     public static function reply(\WP_REST_Request $r)
@@ -170,6 +177,9 @@ class Rest
         }
         update_post_meta($id, '_dcn_author', $author);
         update_post_meta($id, '_dcn_source', self::is_team() ? 'team' : 'client');
+        update_post_meta($id, '_dcn_group', self::group_id($r));
+        update_post_meta($id, '_dcn_contact', self::contact_id($r));
+        $key = self::key($id);
 
         self::tag($r, $note, $id, $author, $text, $kind);
 
@@ -183,7 +193,44 @@ class Rest
             ]);
         }
 
-        return new \WP_REST_Response(Plugin::format($note), 201);
+        return new \WP_REST_Response(Plugin::format($note) + ['key' => $key, 'reply' => $id], 201);
+    }
+
+    /**
+     * POST /items/{id} {text, key} → corregge il testo di una nota o di una risposta, solo finché la nota è aperta.
+     * Può farlo chi l'ha scritta (con la chiave ricevuta all'invio, che il suo browser conserva) o chi è nel team.
+     */
+    public static function edit(\WP_REST_Request $r)
+    {
+        $post = get_post((int) $r['id']);
+        if (!$post || !in_array($post->post_type, [Plugin::NOTE, Plugin::REPLY], true)) {
+            return new \WP_Error('dcn_404', 'Nota non trovata.', ['status' => 404]);
+        }
+        $note = $post->post_type === Plugin::NOTE ? $post : get_post($post->post_parent);
+        if (!$note || (get_post_meta($note->ID, '_dcn_status', true) ?: 'open') !== 'open') {
+            return new \WP_Error('dcn_closed', 'Si può modificare solo finché la nota è aperta.', ['status' => 409]);
+        }
+        $hash = (string) get_post_meta($post->ID, '_dcn_key', true);
+        $key  = (string) $r->get_param('key');
+        if (!self::is_team() && ($hash === '' || $key === '' || !hash_equals($hash, hash('sha256', $key)))) {
+            return new \WP_Error('dcn_forbidden', 'Puoi modificare solo quello che hai scritto tu, dallo stesso browser.', ['status' => 403]);
+        }
+        if ($e = self::throttle()) {
+            return $e;
+        }
+        $text = self::text((string) $r->get_param('text'));
+        if ($text === '') {
+            return new \WP_Error('dcn_text', 'Il testo non può essere vuoto.', ['status' => 400]);
+        }
+        kses_remove_filters();
+        $res = wp_update_post(wp_slash(['ID' => $post->ID, 'post_content' => $text, 'post_title' => mb_substr($text, 0, 60)]), true);
+        kses_init();
+        if (is_wp_error($res)) {
+            return $res;
+        }
+        update_post_meta($post->ID, '_dcn_edited', time());
+
+        return new \WP_REST_Response(Plugin::format($note));
     }
 
     /** POST /notes/{id}/anchor (team): aggiorna selettore e impronta dell'elemento (nota vecchia senza impronta o elemento ritrovato altrove). */
@@ -226,9 +273,9 @@ class Rest
         if (!$note || $note->post_type !== Plugin::NOTE || !in_array($status, self::STATUSES, true)) {
             return new \WP_Error('dcn_400', 'Richiesta non valida.', ['status' => 400]);
         }
-        update_post_meta($note->ID, '_dcn_status', $status);
+        $sent = Plugin::change_status($note, $status, array_map('strval', (array) $r->get_param('notify')), self::text((string) $r->get_param('text')));
 
-        return new \WP_REST_Response(Plugin::format($note));
+        return new \WP_REST_Response(Plugin::format($note) + ['notified' => $sent]);
     }
 
     /* ---- persone esterne da segnalare ---- */
@@ -266,46 +313,9 @@ class Rest
      */
     private static function tag(\WP_REST_Request $r, \WP_Post $note, int $post_id, string $author, string $text, string $kind): void
     {
-        $ids = array_slice(array_filter(array_map('sanitize_key', (array) $r->get_param('tag'))), 0, 5);
-        if (!$ids) {
-            return;
-        }
-        $by = [];
-        foreach (Plugin::contacts() as $c) {
-            $by[$c['id']] = $c;
-        }
-        $n     = (int) get_post_meta($note->ID, '_dcn_n', true);
-        $path  = (string) get_post_meta($note->ID, '_dcn_path', true);
-        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $note->ID;
-        $shot  = (string) get_post_meta($note->ID, '_dcn_shot', true);
-        $image = $shot !== '' ? trailingslashit(wp_get_upload_dir()['basedir']) . $shot : '';
-        $names = [];
-        foreach ($ids as $id) {
-            if (!isset($by[$id])) {
-                continue;
-            }
-            $c       = $by[$id];
-            $names[] = $c['name'];
-            $title   = ['note' => "Una nota per te: #$n", 'reply' => "Una risposta alla nota #$n", 'resolved' => "Nota #$n risolta", 'progress' => "Nota #$n in lavorazione"][$kind];
-            $intro   = "Ciao {$c['name']},\n" . [
-                'note'     => "$author ti ha segnalato la nota #$n sulla pagina $path.",
-                'reply'    => "$author ti ha segnalato una risposta alla nota #$n sulla pagina $path.",
-                'resolved' => "$author ha segnato come risolta la nota #$n sulla pagina $path.",
-                'progress' => "$author ha preso in carico la nota #$n sulla pagina $path: è in lavorazione.",
-            ][$kind];
-            $body    = in_array($kind, ['note', 'reply'], true) ? $text : $note->post_content;
-            Mail::send($c['email'], '[' . Plugin::label() . '] ' . $title, [
-                'project' => Plugin::label(),
-                'title'   => $title,
-                'intro'   => $intro,
-                'items'   => [['n' => $n, 'author' => $kind === 'note' || $kind === 'reply' ? $author : (string) get_post_meta($note->ID, '_dcn_author', true), 'text' => $body]],
-                'image'   => $kind === 'note' ? $image : '',
-                'buttons' => [['label' => 'Apri la pagina nel punto della nota', 'url' => $link, 'primary' => true]],
-                'footer'  => 'Per aprire la pagina serve la password di accesso allo staging: chiedila a chi ti ha scritto. · DUNK Client Notes',
-            ], "$intro\n\n$body\n\nApri la pagina: $link\n");
-        }
-        if ($names) {
-            update_post_meta($post_id, '_dcn_tagged', $names);
+        $ids = array_slice(array_map('strval', (array) $r->get_param('tag')), 0, 5);
+        if ($ids) {
+            Plugin::notify_contacts($note, $post_id, $ids, $author, $text, $kind);
         }
     }
 
@@ -412,13 +422,38 @@ class Rest
         return $name !== '' ? $name : 'Cliente';
     }
 
+    /** Gruppo di lavoro scelto da chi scrive ('' se nessuno o non più esistente). */
+    private static function group_id(\WP_REST_Request $r): string
+    {
+        $id = sanitize_key((string) $r->get_param('group'));
+
+        return $id !== '' && Plugin::group($id) ? $id : '';
+    }
+
+    /** Contatto della rubrica con cui chi scrive si è identificato ('' se nessuno). */
+    private static function contact_id(\WP_REST_Request $r): string
+    {
+        $id = sanitize_key((string) $r->get_param('contact'));
+
+        return $id !== '' && Plugin::contact($id) ? $id : '';
+    }
+
+    /** Chiave per correggere in seguito quello che si è scritto: al browser va la chiave, nel database solo l'hash. */
+    private static function key(int $post_id): string
+    {
+        $key = wp_generate_password(24, false);
+        update_post_meta($post_id, '_dcn_key', hash('sha256', $key));
+
+        return $key;
+    }
+
     private static function unit($v): float
     {
         return min(1.0, max(0.0, (float) $v));
     }
 
     /** Salva lo screenshot (data URL JPEG) in uploads/dunk-notes/ e restituisce il percorso relativo a uploads; '' se non valido. */
-    private static function save_shot(string $data, int $n, float $fx = -1, float $fy = -1): string
+    private static function save_shot(string $data, int $n, float $fx = -1, float $fy = -1, string $color = ''): string
     {
         if (!preg_match('~^data:image/jpeg;base64,([A-Za-z0-9+/=]+)$~', $data, $m)) {
             return '';
@@ -432,7 +467,7 @@ class Rest
             return '';
         }
 
-        $bin = self::stamp($bin, $n, $fx, $fy);
+        $bin = self::stamp($bin, $n, $fx, $fy, $color);
 
         $up  = wp_get_upload_dir();
         $dir = trailingslashit($up['basedir']) . 'dunk-notes';
@@ -448,9 +483,10 @@ class Rest
     /**
      * Disegna sullo screenshot la puntina numerata (stessa forma e colori di quella sul sito) con la punta nel
      * punto cliccato: se poi le puntine si spostano, lo screenshot dice a cosa si riferiva il cliente.
-     * $fx/$fy sono la posizione del clic come frazione della larghezza/altezza. Senza GD o su errore restituisce l'immagine com'è.
+     * $fx/$fy sono la posizione del clic come frazione della larghezza/altezza; $color è il colore del gruppo (#rrggbb, vuoto = giallo DUNK).
+     * Senza GD o su errore restituisce l'immagine com'è.
      */
-    private static function stamp(string $bin, int $n, float $fx, float $fy): string
+    private static function stamp(string $bin, int $n, float $fx, float $fy, string $color = ''): string
     {
         $font = DCN_DIR . 'assets/fonts/dm-sans-latin-700.ttf';
         if ($fx < 0 || $fx > 1 || $fy < 0 || $fy > 1 || !function_exists('imagettftext') || !function_exists('imagecreatefromstring') || !is_readable($font)) {
@@ -489,12 +525,14 @@ class Rest
             ], $col);
         };
         $drop($r + $b, imagecolorallocate($spr, 18, 18, 18));
-        $drop($r, imagecolorallocate($spr, 253, 224, 0));
+        $fill = preg_match('/^#[0-9a-f]{6}$/i', $color) ? sscanf(substr($color, 1), '%02x%02x%02x') : [253, 224, 0];
+        $ink  = $color !== '' && Plugin::ink($color) === '#ffffff' ? [255, 255, 255] : [26, 22, 0];
+        $drop($r, imagecolorallocate($spr, $fill[0], $fill[1], $fill[2]));
         $label = (string) $n;
         $size = $r * $k * (strlen($label) > 2 ? 0.8 : 1.0);
         $box = imagettfbbox($size, 0, $font, $label);
         if ($box) {
-            imagettftext($spr, $size, 0, (int) ($cx - ($box[2] + $box[0]) / 2), (int) ($cy - ($box[7] + $box[1]) / 2), imagecolorallocate($spr, 26, 22, 0), $font, $label);
+            imagettftext($spr, $size, 0, (int) ($cx - ($box[2] + $box[0]) / 2), (int) ($cy - ($box[7] + $box[1]) / 2), imagecolorallocate($spr, $ink[0], $ink[1], $ink[2]), $font, $label);
         }
         $dw = (int) round($sw / $k);
         $dh = (int) round($sh / $k);

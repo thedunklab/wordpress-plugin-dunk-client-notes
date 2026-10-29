@@ -89,6 +89,7 @@ class Plugin
             'team'   => $team,
             'user'   => $team ? $user->display_name : '',
             'admin'  => $team ? admin_url('admin.php?page=dcn-notes') : '',
+            'groups' => array_map(static fn ($g) => $g + ['ink' => self::ink($g['color'])], self::groups()),
             'ready'  => !$team && (bool) self::ready_users(), // lo segnala il cliente: chi è nel team lo riceve
             'autoclose' => (bool) get_option('dcn_autoclose', 1), // chiude il pannello dopo l'invio di una risposta
             'fab'    => ['side' => get_option('dcn_fab_side', 'right') === 'left' ? 'left' : 'right', 'bottom' => (int) get_option('dcn_fab_bottom', 0)], // posizione del pulsante (per non coprire altri widget, es. Iubenda)
@@ -119,6 +120,148 @@ class Plugin
     public static function contacts(): array
     {
         return array_values(array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email'])));
+    }
+
+    /**
+     * Gruppi di lavoro definiti nelle impostazioni (es. Marketing, Regolatorio): nome e colore delle puntine.
+     *
+     * @return array<int, array{id: string, name: string, color: string}>
+     */
+    public static function groups(): array
+    {
+        return array_values(array_filter((array) get_option('dcn_groups', []), static fn ($g) => is_array($g) && isset($g['id'], $g['name'], $g['color'])));
+    }
+
+    /** Il gruppo con quell'id, oppure null (gruppo cancellato o nessun gruppo). */
+    public static function group(string $id): ?array
+    {
+        foreach (self::groups() as $g) {
+            if ($g['id'] === $id) {
+                return $g;
+            }
+        }
+
+        return null;
+    }
+
+    /** Colore del testo leggibile sopra un colore di sfondo (#rrggbb): quasi nero o bianco. */
+    public static function ink(string $hex): string
+    {
+        [$r, $g, $b] = sscanf(ltrim($hex, '#'), '%02x%02x%02x') + [0, 0, 0];
+
+        return (0.299 * $r + 0.587 * $g + 0.114 * $b) > 150 ? '#1a1600' : '#ffffff';
+    }
+
+    /** Il contatto della rubrica con quell'id, oppure null. */
+    public static function contact(string $id): ?array
+    {
+        foreach (self::contacts() as $c) {
+            if ($c['id'] === $id) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Contatti da proporre come destinatari quando il team cambia lo stato di una nota:
+     * chi l'ha scritta o ha risposto (se è nella rubrica) e chi è stato segnalato.
+     *
+     * @return string[] id dei contatti
+     */
+    public static function involved(\WP_Post $note): array
+    {
+        $ids = array_merge([(string) get_post_meta($note->ID, '_dcn_contact', true)], (array) get_post_meta($note->ID, '_dcn_tagged_ids', true));
+        foreach (get_posts(['post_type' => self::REPLY, 'post_parent' => $note->ID, 'posts_per_page' => 100, 'fields' => 'ids']) as $rid) {
+            $ids = array_merge($ids, [(string) get_post_meta($rid, '_dcn_contact', true)], (array) get_post_meta($rid, '_dcn_tagged_ids', true));
+        }
+        $known = wp_list_pluck(self::contacts(), 'id');
+
+        return array_values(array_intersect(array_unique(array_filter(array_map('strval', $ids))), $known));
+    }
+
+    /**
+     * Email a ciascun contatto scelto (max 10) per una nota, una risposta o un cambio di stato; salva sulla nota/risposta
+     * nomi e id dei segnalati. $kind: note, reply, resolved, progress. $text: testo della risposta o messaggio del team.
+     *
+     * @param string[] $ids id dei contatti
+     * @return string[] nomi delle persone avvisate
+     */
+    public static function notify_contacts(\WP_Post $note, int $post_id, array $ids, string $author, string $text, string $kind): array
+    {
+        $ids = array_slice(array_unique(array_filter(array_map('sanitize_key', $ids))), 0, 10);
+        $n     = (int) get_post_meta($note->ID, '_dcn_n', true);
+        $path  = (string) get_post_meta($note->ID, '_dcn_path', true);
+        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $note->ID;
+        $shot  = (string) get_post_meta($note->ID, '_dcn_shot', true);
+        $image = $shot !== '' ? trailingslashit(wp_get_upload_dir()['basedir']) . $shot : '';
+        $state = in_array($kind, ['resolved', 'progress'], true);
+        $names = [];
+        $sent  = [];
+        foreach ($ids as $id) {
+            $c = self::contact($id);
+            if (!$c) {
+                continue;
+            }
+            $names[] = $c['name'];
+            $sent[]  = $c['id'];
+            $title   = ['note' => "Una nota per te: #$n", 'reply' => "Una risposta alla nota #$n", 'resolved' => "Nota #$n risolta", 'progress' => "Nota #$n in lavorazione"][$kind];
+            $intro   = "Ciao {$c['name']},\n" . [
+                'note'     => "$author ti ha segnalato la nota #$n sulla pagina $path.",
+                'reply'    => "$author ti ha segnalato una risposta alla nota #$n sulla pagina $path.",
+                'resolved' => "$author ha segnato come risolta la nota #$n sulla pagina $path.",
+                'progress' => "$author ha preso in carico la nota #$n sulla pagina $path: è in lavorazione.",
+            ][$kind];
+            $items = [['n' => $n, 'author' => $state ? (string) get_post_meta($note->ID, '_dcn_author', true) : $author, 'text' => $state ? $note->post_content : $text]];
+            // messaggio scritto dal team insieme al cambio di stato (non il testo automatico)
+            if ($state && $text !== '' && $text !== self::status_text($kind)) {
+                $items[] = ['n' => '↳', 'author' => $author, 'text' => $text];
+            }
+            $plain = $intro . "\n\n" . implode("\n\n", array_map(static fn ($i) => $i['author'] . ': ' . $i['text'], $items)) . "\n\nApri la pagina: $link\n";
+            Mail::send($c['email'], '[' . self::label() . '] ' . $title, [
+                'project' => self::label(),
+                'title'   => $title,
+                'intro'   => $intro,
+                'items'   => $items,
+                'image'   => $kind === 'note' || $state ? $image : '',
+                'buttons' => [['label' => 'Apri la pagina nel punto della nota', 'url' => $link, 'primary' => true]],
+                'footer'  => 'Per aprire la pagina serve la password di accesso allo staging: chiedila a chi ti ha scritto. · DUNK Client Notes',
+            ], $plain);
+        }
+        if ($names) {
+            update_post_meta($post_id, '_dcn_tagged', $names);
+            update_post_meta($post_id, '_dcn_tagged_ids', $sent);
+        }
+
+        return $names;
+    }
+
+    /**
+     * Cambio di stato da parte del team. Se la nota passa a «In lavorazione» o «Risolta» e c'è un messaggio o qualcuno
+     * da avvisare, aggiunge alla conversazione una risposta del team (il messaggio o il testo automatico dello stato)
+     * e manda l'email ai contatti scelti.
+     *
+     * @param string[] $notify id dei contatti da avvisare
+     * @return string[] nomi delle persone avvisate
+     */
+    public static function change_status(\WP_Post $note, string $status, array $notify = [], string $text = ''): array
+    {
+        update_post_meta($note->ID, '_dcn_status', $status);
+        if (self::status_text($status) === '' || ($text === '' && !$notify)) {
+            return [];
+        }
+        $text   = $text !== '' ? $text : self::status_text($status);
+        $author = wp_get_current_user()->display_name;
+        $rid    = self::insert(['post_type' => self::REPLY, 'post_status' => 'publish', 'post_parent' => $note->ID, 'post_title' => mb_substr($text, 0, 60), 'post_content' => $text]);
+        if (is_wp_error($rid)) {
+            return [];
+        }
+        update_post_meta($rid, '_dcn_author', $author);
+        update_post_meta($rid, '_dcn_source', 'team');
+        update_post_meta($rid, '_dcn_kind', $status);
+
+        return self::notify_contacts($note, $rid, $notify, $author, $text, $status);
     }
 
     /** Testo automatico di una risposta senza messaggio, quando il team ha cambiato lo stato della nota. */
@@ -172,8 +315,11 @@ class Plugin
                 'id'     => $r->ID,
                 'author' => (string) get_post_meta($r->ID, '_dcn_author', true),
                 'source' => (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client',
+                'group'  => (string) get_post_meta($r->ID, '_dcn_group', true),
+                'kind'   => (string) get_post_meta($r->ID, '_dcn_kind', true), // '' = risposta, altrimenti cambio di stato del team
                 'text'   => wp_specialchars_decode($r->post_content, ENT_QUOTES),
                 'date'   => self::human_date($r),
+                'edited' => (bool) get_post_meta($r->ID, '_dcn_edited', true),
                 'tagged' => array_values(array_filter((array) get_post_meta($r->ID, '_dcn_tagged', true))),
             ];
         }
@@ -183,6 +329,9 @@ class Plugin
             'n'        => (int) $meta('n'),
             'author'   => (string) $meta('author'),
             'source'   => (string) $meta('source') ?: 'client',
+            'group'    => (string) $meta('group'),
+            'edited'   => (bool) $meta('edited'),
+            'involved' => self::involved($note),
             'text'     => wp_specialchars_decode($note->post_content, ENT_QUOTES),
             'status'   => (string) $meta('status') ?: 'open',
             'path'     => (string) $meta('path'),

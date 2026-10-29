@@ -36,8 +36,19 @@
         return json
     }
     const STATUS = { open: 'Aperta', progress: 'In lavorazione', resolved: 'Risolta' }
-    const savedName = () => { try { return localStorage.getItem('dcn_name') || '' } catch { return '' } }
-    const saveName = (n) => { try { localStorage.setItem('dcn_name', n) } catch { /* nessun salvataggio */ } }
+    const stored = (k) => { try { return localStorage.getItem(k) || '' } catch { return '' } }
+    const store = (k, v) => { try { localStorage.setItem(k, v) } catch { /* nessun salvataggio */ } }
+    const savedName = () => stored('dcn_name')
+    const saveName = (n) => store('dcn_name', n)
+    // chiavi per correggere ciò che si è scritto da questo browser (id nota/risposta → chiave)
+    const keys = () => { try { return JSON.parse(stored('dcn_keys') || '{}') } catch { return {} } }
+    const saveKey = (id, key) => { if (!key) return; const k = keys(); k[id] = key; store('dcn_keys', JSON.stringify(k)) }
+
+    /* gruppi di lavoro (Impostazioni): colore delle puntine */
+    const GROUPS = cfg.groups || []
+    const groupOf = (id) => GROUPS.find((g) => g.id === id) || null
+    const groupTint = (el, id) => { const g = groupOf(id); if (g) { el.classList.add('g'); el.style.setProperty('--g', g.color); el.style.setProperty('--g-ink', g.ink) } return el }
+    const groupChip = (id) => { const g = groupOf(id); return g ? h('span', { class: 'grp', style: `--g:${g.color};--g-ink:${g.ink}` }, g.name) : null }
 
     /* ---------- radice (Shadow DOM) ---------- */
     const host = h('div', { id: 'dcn-root' })
@@ -254,11 +265,11 @@
     const renderPins = () => {
         pinsLayer.replaceChildren(
             ...visibleNotes().map((n) =>
-                h('button', {
+                groupTint(h('button', {
                     class: `pin ${n.status}${state.current === n.id && state.view === 'note' ? ' active' : ''}`,
-                    type: 'button', 'data-id': n.id, title: n.text.slice(0, 80), 'aria-label': 'Nota ' + n.n,
+                    type: 'button', 'data-id': n.id, title: (groupOf(n.group) ? groupOf(n.group).name + ' · ' : '') + n.text.slice(0, 80), 'aria-label': 'Nota ' + n.n,
                     onclick: () => openNote(n.id),
-                }, h('span', {}, n.n))
+                }, h('span', {}, n.n)), n.group)
             )
         )
         placePins()
@@ -270,7 +281,7 @@
         if (show) { state.view = state.view === 'note' ? 'note' : 'list'; load() }
     }
 
-    const numBadge = (n) => h('span', { class: `num ${n.status}` }, n.n)
+    const numBadge = (n) => groupTint(h('span', { class: `num ${n.status}` }, n.n), n.group)
     const statusBadge = (s) => h('span', { class: `st ${s}` }, STATUS[s])
 
     const renderPanel = () => {
@@ -310,12 +321,37 @@
         )))
     }
 
+    /* chi scrive: nome (suggerito dalla rubrica, così alla chiusura della nota lo si può avvisare via email) e gruppo di lavoro */
+    let identN = 0
+    const identity = () => {
+        const list = 'dcn-people-' + (++identN)
+        const name = h('input', { type: 'text', placeholder: 'Il tuo nome e cognome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, list, autocomplete: 'off', 'aria-label': 'Il tuo nome' })
+        const people = h('datalist', { id: list }, ...state.contacts.map((c) => h('option', { value: c.name })))
+        let group = groupOf(stored('dcn_group')) ? stored('dcn_group') : ''
+        const groups = GROUPS.length ? h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, 'Gruppo'),
+            ...GROUPS.map((g) => h('button', { class: 'chip g', type: 'button', style: `--g:${g.color};--g-ink:${g.ink}`, 'aria-pressed': String(group === g.id), onclick: (e) => {
+                group = group === g.id ? '' : g.id
+                e.currentTarget.parentElement.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget && group !== '')))
+            } }, g.name))) : null
+        const contact = () => state.contacts.find((c) => c.name.trim().toLowerCase() === name.value.trim().toLowerCase())?.id || ''
+        return {
+            els: [name, cfg.team ? null : people, groups],
+            name,
+            // salva nome e gruppo per le prossime note e restituisce i campi da inviare
+            value: () => {
+                if (!cfg.team) saveName(name.value.trim())
+                store('dcn_group', group)
+                return { author: name.value, group, contact: cfg.team ? '' : contact() }
+            },
+        }
+    }
+
     /* scelta delle persone esterne da segnalare (nel modulo di nota e in quello di risposta) */
-    const tagPicker = () => {
-        const chosen = new Set()
+    const tagPicker = (label = 'Segnala a', preset = []) => {
+        const chosen = new Set(preset.filter((id) => state.contacts.some((c) => c.id === id)))
         if (!state.contacts.length) return { el: null, value: () => [] }
-        const el = h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, 'Segnala a'),
-            ...state.contacts.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': 'false', title: c.email, onclick: (e) => {
+        const el = h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, label),
+            ...state.contacts.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(chosen.has(c.id)), title: c.email, onclick: (e) => {
                 chosen.has(c.id) ? chosen.delete(c.id) : chosen.add(c.id)
                 e.currentTarget.setAttribute('aria-pressed', String(chosen.has(c.id)))
             } }, c.name)))
@@ -390,6 +426,7 @@
                 h('span', { class: 'txt' }, n.text),
                 h('span', { class: 'item-meta' },
                     h('span', {}, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : ''),
+                    groupChip(n.group),
                     state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
                     n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
                     n.status !== 'open' ? statusBadge(n.status) : null)
@@ -409,44 +446,81 @@
         renderPanel()
     }
 
+    /* correzione di una nota o di una risposta già inviata: solo finché la nota è aperta, per chi l'ha scritta (da questo browser) o per il team */
+    const canEdit = (n, id) => n.status === 'open' && (cfg.team || !!keys()[id])
+    const editable = (n, item, tag = 'p') => {
+        const txt = h(tag, {}, item.text)
+        if (!canEdit(n, item.id)) return [txt, null]
+        const btn = h('button', { class: 'edit', type: 'button', title: 'Correggi il testo', onclick: () => {
+            const area = h('textarea', { maxlength: 2000, required: true, 'aria-label': 'Testo corretto' }, item.text)
+            const save = h('button', { class: 'btn primary', type: 'submit' }, 'Salva')
+            const form = h('form', { class: 'form edit-form', onsubmit: async (e) => {
+                e.preventDefault()
+                save.disabled = true
+                try { await api(`/items/${item.id}`, { method: 'POST', body: { text: area.value, key: keys()[item.id] || '' } }); await load(); toast('Testo corretto.') } catch (err) { toast(err.message); save.disabled = false }
+            } }, area, h('div', { class: 'row' }, save, h('button', { class: 'btn', type: 'button', onclick: () => form.replaceWith(txt) }, 'Annulla')))
+            txt.replaceWith(form)
+            area.focus()
+        } }, 'Modifica')
+        return [txt, btn]
+    }
+
+    /* cambio di stato (team): per «In lavorazione» e «Risolta» si scelgono le persone da avvisare via email e un messaggio facoltativo */
+    const statusBox = (body, n) => {
+        const row = h('div', { class: 'status-row' })
+        const box = h('div')
+        const setStatus = async (k, extra = {}) => {
+            try {
+                const res = await api(`/notes/${n.id}/status`, { method: 'POST', body: { status: k, ...extra } })
+                await load()
+                toast(res.notified?.length ? `Email inviata a ${res.notified.join(', ')}.` : `Stato: ${STATUS[k].toLowerCase()}.`)
+            } catch (e) { toast(e.message) }
+        }
+        Object.entries(STATUS).forEach(([k, label]) => row.append(h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: () => {
+            if (k === 'open') { setStatus(k); return }
+            const who = tagPicker('Avvisa via email', n.involved || [])
+            const msg = h('textarea', { placeholder: 'Messaggio (facoltativo)', maxlength: 2000, 'aria-label': 'Messaggio' })
+            const ok = h('button', { class: 'btn primary', type: 'submit' }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
+            box.replaceChildren(h('form', { class: 'form status-form', onsubmit: (e) => { e.preventDefault(); ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }) } },
+                h('b', {}, k === 'resolved' ? 'Chiudi la nota' : 'Prendi in carico la nota'),
+                who.el || h('p', { class: 'hint-txt' }, 'Per avvisare qualcuno via email aggiungilo tra le persone esterne (icona in alto nel pannello).'),
+                msg, h('div', { class: 'row' }, ok, h('button', { class: 'btn', type: 'button', onclick: () => box.replaceChildren() }, 'Annulla'))))
+        } }, label)))
+        body.append(row, box, h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
+    }
+
     const renderNote = (body) => {
         const n = state.notes.find((x) => x.id === state.current) || (state.all || []).find((x) => x.id === state.current)
         if (!n) { body.append(h('div', { class: 'empty' }, 'Nota non trovata.')); return }
+        const [noteText, noteEdit] = editable(n, n)
         body.append(h('div', { class: 'note-card' },
             h('div', { class: 'by' }, numBadge(n),
                 h('div', { class: 'by-info' },
-                    h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null),
-                    h('div', { class: 'by-meta' }, n.date, statusBadge(n.status), n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null))),
-            h('p', {}, n.text),
+                    h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null, groupChip(n.group)),
+                    h('div', { class: 'by-meta' }, n.date, n.edited ? ' · modificata' : '', statusBadge(n.status), n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null, noteEdit))),
+            noteText,
             n.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + n.tagged.join(', ')) : null,
             n.shot ? h('a', { class: 'shot', href: n.shot, target: '_blank', rel: 'noopener' }, h('img', { src: n.shot, alt: 'Screenshot della pagina al momento della nota', loading: 'lazy' })) : null
         ))
-        if (cfg.team) {
-            body.append(h('div', { class: 'status-row' }, ...Object.entries(STATUS).map(([k, label]) =>
-                h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: async () => {
-                    try { await api(`/notes/${n.id}/status`, { method: 'POST', body: { status: k } }); await load(); } catch (e) { toast(e.message) }
-                } }, label))
-            ), h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
-        }
-        n.replies.forEach((r) => body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', h('span', { class: 'meta' }, ' · ' + r.date), h('p', {}, r.text), r.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + r.tagged.join(', ')) : null)))
-        const name = h('input', { type: 'text', placeholder: 'Il tuo nome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, 'aria-label': 'Il tuo nome' })
-        // il team può inviare anche senza testo se la nota è «Risolta» o «In lavorazione»: parte solo l'avviso del nuovo stato
-        const statusOnly = cfg.team && n.status !== 'open'
-        const text = h('textarea', { placeholder: statusOnly ? 'Facoltativa: scrivi un messaggio o invia solo lo stato…' : 'Scrivi una risposta…', maxlength: 2000, required: !statusOnly, 'aria-label': 'Risposta' })
+        if (cfg.team) statusBox(body, n)
+        n.replies.forEach((r) => {
+            const [txt, edit] = editable(n, r)
+            body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', groupChip(r.group), h('span', { class: 'meta' }, ' · ' + r.date + (r.edited ? ' · modificata' : '')), edit, txt, r.tagged?.length ? h('p', { class: 'tagged' }, (r.kind ? 'Avvisati via email: ' : 'Segnalata a: ') + r.tagged.join(', ')) : null))
+        })
+        const who = identity()
+        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, required: true, 'aria-label': 'Risposta' })
         const send = h('button', { class: 'btn primary', type: 'submit' }, 'Rispondi')
-        if (statusOnly) text.addEventListener('input', () => { send.textContent = text.value.trim() ? 'Rispondi' : `Invia: ${STATUS[n.status].toLowerCase()}` })
-        if (statusOnly) send.textContent = `Invia: ${STATUS[n.status].toLowerCase()}`
         const tags = tagPicker()
         body.append(h('form', { class: 'form', onsubmit: async (e) => {
             e.preventDefault()
             send.disabled = true
             try {
-                if (!cfg.team) saveName(name.value.trim())
-                await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, author: name.value, tag: tags.value() } })
+                const res = await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, tag: tags.value(), ...who.value() } })
+                saveKey(res.reply, res.key)
                 await load()
                 if (cfg.autoclose) { panel.hidden = true; state.view = 'list'; renderPins(); renderPanel() }
             } catch (err) { toast(err.message); send.disabled = false }
-        } }, name, text, tags.el, send))
+        } }, ...who.els, text, tags.el, send))
     }
 
     /* ---------- nuova nota: scelta dell'elemento ---------- */
@@ -473,6 +547,8 @@
             cx: e.clientX, cy: e.clientY,
         }
         stopPick()
+        pick.vh = innerHeight
+        pick.shot = capture() // subito, con la pagina com'è nel momento del clic
         openComposer(pick)
     }
     const onKey = (e) => { if (e.key === 'Escape') stopPick() }
@@ -502,29 +578,60 @@
         document.removeEventListener('keydown', onKey, true)
     }
 
-    /* ---------- screenshot ---------- */
-    async function capture(cx, cy) {
-        if (typeof window.html2canvas !== 'function') return ''
+    /* ---------- screenshot ----------
+     * Si cattura la parte di pagina visibile nel momento del clic (non all'invio: intanto si può scorrere).
+     * html2canvas disegna gli elementi `fixed` (es. header) dove starebbero a pagina non scorsa e ignora `sticky`:
+     * nel clone li si mette in posizione assoluta/relativa nel punto in cui si vedono adesso. */
+    const pinnedBoxes = () => {
+        const out = []
+        for (const el of document.body.querySelectorAll('*')) {
+            if (inRoot(el)) continue
+            const pos = getComputedStyle(el).position
+            if (pos !== 'fixed' && pos !== 'sticky') continue
+            const r = el.getBoundingClientRect()
+            if (!r.width || !r.height) continue
+            if (pos === 'fixed') {
+                // contenitore della posizione assoluta: il primo antenato posizionato (o con transform), altrimenti la pagina
+                let cb = el.parentElement
+                while (cb && cb !== document.documentElement && getComputedStyle(cb).position === 'static' && getComputedStyle(cb).transform === 'none') cb = cb.parentElement
+                const own = cb && cb !== document.documentElement
+                const base = own ? cb.getBoundingClientRect() : { left: -scrollX, top: -scrollY }
+                const bl = own ? cb.clientLeft - cb.scrollLeft : 0
+                const bt = own ? cb.clientTop - cb.scrollTop : 0
+                out.push([el, { position: 'absolute', left: (r.left - base.left - bl) + 'px', top: (r.top - base.top - bt) + 'px', right: 'auto', bottom: 'auto', width: r.width + 'px', height: r.height + 'px', margin: '0', transform: 'none' }])
+            } else {
+                // di quanto lo sticky è spostato rispetto alla sua posizione normale
+                const prev = el.style.position
+                el.style.position = 'static'
+                const s = el.getBoundingClientRect()
+                el.style.position = prev
+                out.push([el, { position: 'relative', top: (r.top - s.top) + 'px', left: (r.left - s.left) + 'px', bottom: 'auto', right: 'auto' }])
+            }
+        }
+        return out.slice(0, 200)
+    }
+    function capture() {
+        if (typeof window.html2canvas !== 'function' || !innerWidth || !innerHeight) return Promise.resolve('')
         const scale = Math.min(1, 1280 / innerWidth)
-        try {
-            const canvas = await Promise.race([
-                window.html2canvas(document.documentElement, {
-                    x: scrollX, y: scrollY, width: innerWidth, height: innerHeight, scale,
-                    useCORS: true, logging: false, backgroundColor: '#ffffff',
-                    windowWidth: document.documentElement.clientWidth, windowHeight: innerHeight,
-                    ignoreElements: (el) => el.id === 'dcn-root',
-                }),
-                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
-            ])
-            // la puntina numerata la disegna il server (è lui ad assegnare il numero della nota)
-            return canvas.toDataURL('image/jpeg', 0.72)
-        } catch { return '' }
+        const boxes = pinnedBoxes()
+        boxes.forEach(([el], i) => el.setAttribute('data-dcn-fx', i))
+        const run = window.html2canvas(document.documentElement, {
+            x: scrollX, y: scrollY, width: innerWidth, height: innerHeight, scale,
+            useCORS: true, logging: false, backgroundColor: '#ffffff',
+            windowWidth: document.documentElement.clientWidth, windowHeight: innerHeight,
+            ignoreElements: (el) => el.id === 'dcn-root',
+            onclone: (doc) => boxes.forEach(([, css], i) => { const c = doc.querySelector(`[data-dcn-fx="${i}"]`); if (c) Object.entries(css).forEach(([k, v]) => c.style.setProperty(k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()), v, 'important')) }),
+        })
+        // la puntina numerata la disegna il server (è lui ad assegnare il numero della nota)
+        return Promise.race([run, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))])
+            .then((canvas) => canvas.toDataURL('image/jpeg', 0.72)).catch(() => '')
+            .finally(() => boxes.forEach(([el]) => el.removeAttribute('data-dcn-fx')))
     }
 
     /* ---------- composer ---------- */
     function openComposer(pick) {
         closeComposer()
-        const name = h('input', { type: 'text', placeholder: 'Il tuo nome', value: cfg.team ? cfg.user : savedName(), maxlength: 60, required: true, hidden: cfg.team, 'aria-label': 'Il tuo nome' })
+        const who = identity()
         const text = h('textarea', { placeholder: 'Cosa vuoi segnalare o modificare?', maxlength: 2000, required: true, 'aria-label': 'Nota' })
         const shot = h('input', { type: 'checkbox', checked: true })
         const send = h('button', { class: 'btn primary', type: 'submit' }, 'Invia nota')
@@ -532,31 +639,26 @@
         const form = h('form', { class: 'composer', onsubmit: async (e) => {
             e.preventDefault()
             send.disabled = true; send.textContent = 'Invio…'
-            if (!cfg.team) saveName(name.value.trim())
             try {
-                let screenshot = ''
-                if (shot.checked) {
-                    form.hidden = true // fuori dallo screenshot
-                    screenshot = await capture(pick.cx, pick.cy)
-                    form.hidden = false
-                }
+                const screenshot = shot.checked ? await pick.shot : ''
                 const note = await api('/notes', { method: 'POST', body: {
                     path, url: location.href.split('#')[0], selector: pick.selector, sel2: pick.sel2, anchor: pick.anchor, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
-                    vw: innerWidth, text: text.value, author: name.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / innerHeight, tag: tags.value(),
+                    vw: innerWidth, text: text.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / pick.vh, tag: tags.value(), ...who.value(),
                 } })
+                saveKey(note.id, note.key)
                 closeComposer()
                 toast('Nota inviata. Grazie!')
                 await load()
                 openNote(note.id)
-            } catch (err) { form.hidden = false; toast(err.message); send.disabled = false; send.textContent = 'Invia nota' }
+            } catch (err) { toast(err.message); send.disabled = false; send.textContent = 'Invia nota' }
         } },
-            h('h3', {}, 'Nuova nota'), name, text, tags.el,
+            h('h3', {}, 'Nuova nota'), ...who.els, text, tags.el,
             h('label', { class: 'check' }, shot, 'Allega uno screenshot della pagina'),
             h('div', { class: 'row' }, send, h('button', { class: 'btn', type: 'button', onclick: closeComposer }, 'Annulla'))
         )
         const w = 320
         form.style.left = Math.max(12, Math.min(innerWidth - w - 12, pick.cx + 14)) + 'px'
-        form.style.top = Math.max(12, Math.min(innerHeight - 300, pick.cy + 14)) + 'px'
+        form.style.top = Math.max(12, Math.min(innerHeight - 380, pick.cy + 14)) + 'px'
         // segnaposto provvisorio nel punto scelto
         state.composer = { form, pick }
         overlay.append(form)
