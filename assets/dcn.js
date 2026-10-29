@@ -39,7 +39,6 @@
     const stored = (k) => { try { return localStorage.getItem(k) || '' } catch { return '' } }
     const store = (k, v) => { try { localStorage.setItem(k, v) } catch { /* nessun salvataggio */ } }
     const savedName = () => stored('dcn_name')
-    const saveName = (n) => store('dcn_name', n)
     // chiavi per correggere ciò che si è scritto da questo browser (id nota/risposta → chiave)
     const keys = () => { try { return JSON.parse(stored('dcn_keys') || '{}') } catch { return {} } }
     const saveKey = (id, key) => { if (!key) return; const k = keys(); k[id] = key; store('dcn_keys', JSON.stringify(k)) }
@@ -240,7 +239,9 @@
             state.all = await api('/notes')
             state.notes = state.all.filter((n) => n.path === path)
             state.contacts = await api('/contacts')
+            adoptOldName()
             if (cfg.ready) state.ready = await api('/ready?path=' + encodeURIComponent(path))
+            state.loaded = true
         } catch (e) { toast(e.message) }
         render()
     }
@@ -278,7 +279,7 @@
     const togglePanel = (open) => {
         const show = open ?? panel.hidden
         panel.hidden = !show
-        if (show) { state.view = state.view === 'note' ? 'note' : 'list'; load() }
+        if (show) { state.view = state.view === 'note' ? 'note' : state.view === 'who' ? 'who' : 'list'; load() }
     }
 
     const numBadge = (n) => groupTint(h('span', { class: `num ${n.status}` }, n.n), n.group)
@@ -286,14 +287,19 @@
 
     const renderPanel = () => {
         if (panel.hidden) return
+        // prima di tutto si sceglie chi scrive (una volta sola: poi lo ricorda il browser)
+        if (state.loaded && !identified()) state.view = 'who'
+        const who = state.view === 'who'
         const head = h('div', { class: 'head' },
-            state.view === 'note' ? h('button', { class: 'icon', type: 'button', 'aria-label': 'Indietro', onclick: () => { state.view = 'list'; renderPins(); renderPanel() } }, '←') : null,
-            h('h2', {}, state.view === 'note' ? 'Nota' : state.view === 'contacts' ? 'Persone esterne' : `Note · ${cfg.label}`),
+            state.view === 'note' || (who && identified()) ? h('button', { class: 'icon', type: 'button', 'aria-label': 'Indietro', onclick: () => { state.view = 'list'; state.whoStep = ''; renderPins(); renderPanel() } }, '←') : null,
+            h('h2', {}, state.view === 'note' ? 'Nota' : state.view === 'contacts' ? 'Persone esterne' : who ? 'Chi sei?' : `Note · ${cfg.label}`),
             h('button', { class: 'icon', type: 'button', 'aria-label': 'Chiudi', onclick: () => { panel.hidden = true } }, '✕')
         )
         const body = h('div', { class: 'body' })
-        panel.replaceChildren(...[head, state.view === 'note' ? null : toolbar(), body, byDunk()].filter(Boolean))
-        state.view === 'note' ? renderNote(body) : state.view === 'contacts' ? renderContacts(body) : renderList(body)
+        if (!state.loaded) body.append(h('div', { class: 'empty' }, 'Caricamento…'))
+        panel.replaceChildren(...[head, who ? null : whoBar(), state.view === 'note' || who ? null : toolbar(), body, byDunk()].filter(Boolean))
+        if (!state.loaded) return
+        who ? renderWho(body) : state.view === 'note' ? renderNote(body) : state.view === 'contacts' ? renderContacts(body) : renderList(body)
     }
 
     const LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700.9 334.8" fill="currentColor" aria-hidden="true"><path d="M140.5,19.1C129,6.4,111.7,0,88.8,0H0v235l64.8-8.8V56.2h7.1c6.2,0,10.9.6,13.9,1.9,3,1.2,5.1,3.7,6.2,7.3,1.1,3.6,1.7,9.1,1.7,16.3v140.6l65.1-8.8-.7-137.8c-.2-25-6.1-43.8-17.6-56.6h0Z"></path> <path d="M102.4,257.6c0,11.5-5.9,17.2-17.6,17.2h-11.2v-38.6l-64.8,8.8v86.8h86.5c26,0,44.6-8,55.8-24s16.7-39.8,16.5-71.5v-12.8c0,0-65.2,8.8-65.2,8.8v25.3h0Z"></path> <polygon points="236 0 173.4 0 173.4 211.5 236 203 236 0"></polygon> <polygon points="267.4 0 267.4 198.8 330 190.3 330 0 267.4 0"></polygon> <path d="M276.2,243c0,10.5-1,18.5-3,24.2s-6.2,8.4-12.7,8.4-10.7-2.9-12.7-8.6c-2-5.7-3-13.7-3-24v-30l-62.6,8.5v24.1c0,29.5,6.4,51.7,19.3,66.7,12.9,15,32.5,22.5,59,22.5s46.1-7.5,59-22.5,19.3-37.2,19.3-66.7v-45.3l-62.5,8.5v34.2h0Z"></path> <polygon points="451.1 331.8 514 331.8 514 176.5 422.5 188.9 451.1 331.8"></polygon> <polygon points="356 331.8 418.9 331.8 418.9 189.4 356 197.9 356 331.8"></polygon> <polygon points="443.1 0 443.1 153.9 413.5 0 347.2 0 347.2 187.9 410.1 179.4 410.1 160.7 413.8 178.9 505.3 166.5 505.3 0 443.1 0"></polygon> <polygon points="657.5 157.1 535 173.7 535 331.8 599 331.8 599 175.9 634.3 331.8 700.9 331.8 657.5 157.2 657.5 157.1"></polygon> <polygon points="684.7 0 619.9 0 589.9 128.9 589.9 0 526.3 0 526.3 163.7 648.8 147.1 684.7 0"></polygon></svg>'
@@ -305,57 +311,130 @@
     const renderContacts = (body) => {
         const name = h('input', { type: 'text', placeholder: 'Nome e cognome', maxlength: 80, required: true, 'aria-label': 'Nome e cognome' })
         const email = h('input', { type: 'email', placeholder: 'Email', maxlength: 120, required: true, 'aria-label': 'Email' })
-        const add = h('button', { class: 'btn primary add', type: 'submit', title: 'Aggiungi', 'aria-label': 'Aggiungi' }, '+')
+        const add = h('button', { class: 'btn primary add', type: 'button', title: 'Aggiungi', 'aria-label': 'Aggiungi', onclick: async () => {
+            add.disabled = true
+            try { state.contacts = (await api('/contacts', { method: 'POST', body: { name: name.value, email: email.value } })).contacts; toast(cfg.team ? 'Persona aggiunta.' : 'Persona aggiunta: il team la confermerà.'); renderPanel() } catch (err) { toast(err.message); add.disabled = false }
+        } }, '+')
+        needs(add, name, email)
         body.append(
             h('p', { class: 'hint-txt' }, 'Aggiungi chi vuoi coinvolgere fuori dal team: scrivendo una nota o una risposta potrai segnalarla a queste persone, che la riceveranno via email.'),
-            h('form', { class: 'form contact-form', onsubmit: async (e) => {
-                e.preventDefault()
-                add.disabled = true
-                try { state.contacts = await api('/contacts', { method: 'POST', body: { name: name.value, email: email.value } }); toast('Persona aggiunta.'); renderPanel() } catch (err) { toast(err.message); add.disabled = false }
-            } }, name, h('div', { class: 'row' }, email, add))
+            form({ class: 'form contact-form' }, name, h('div', { class: 'row' }, email, add))
         )
-        if (!state.contacts.length) { body.append(h('div', { class: 'empty' }, 'Nessuna persona aggiunta.')); return }
-        state.contacts.forEach((c) => body.append(h('div', { class: 'contact' },
+        const people = state.contacts.filter((c) => cfg.team || !c.pending)
+        if (!people.length) { body.append(h('div', { class: 'empty' }, 'Nessuna persona aggiunta.')); return }
+        people.forEach((c) => body.append(h('div', { class: 'contact' },
             h('span', { class: 'avatar' }, c.name.trim().charAt(0).toUpperCase()),
-            h('span', { class: 'contact-info' }, h('b', {}, c.name), h('span', { class: 'meta' }, c.email))
+            h('span', { class: 'contact-info' }, h('b', {}, c.name, c.pending ? h('span', { class: 'pending' }, 'da confermare') : null), h('span', { class: 'meta' }, c.email))
         )))
     }
 
-    /* chi scrive: nome (suggerito dalla rubrica, così alla chiusura della nota lo si può avvisare via email) e gruppo di lavoro */
-    let identN = 0
-    const identity = () => {
-        const list = 'dcn-people-' + (++identN)
-        const name = h('input', { type: 'text', placeholder: 'Il tuo nome e cognome', value: savedName(), maxlength: 60, required: !cfg.team, hidden: cfg.team, list, autocomplete: 'off', 'aria-label': 'Il tuo nome' })
-        const people = h('datalist', { id: list }, ...state.contacts.map((c) => h('option', { value: c.name })))
-        let group = groupOf(stored('dcn_group')) ? stored('dcn_group') : ''
-        const groups = GROUPS.length ? h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, 'Gruppo'),
-            ...GROUPS.map((g) => h('button', { class: 'chip g', type: 'button', style: `--g:${g.color};--g-ink:${g.ink}`, 'aria-pressed': String(group === g.id), onclick: (e) => {
-                group = group === g.id ? '' : g.id
-                e.currentTarget.parentElement.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c === e.currentTarget && group !== '')))
-            } }, g.name))) : null
-        const contact = () => state.contacts.find((c) => c.name.trim().toLowerCase() === name.value.trim().toLowerCase())?.id || ''
-        return {
-            els: [name, cfg.team ? null : people, groups],
-            name,
-            // salva nome e gruppo per le prossime note e restituisce i campi da inviare
-            value: () => {
-                if (!cfg.team) saveName(name.value.trim())
-                store('dcn_group', group)
-                return { author: name.value, group, contact: cfg.team ? '' : contact() }
-            },
-        }
+    /* ---------- chi scrive ----------
+     * Si sceglie una volta sola, alla prima apertura del pannello: il proprio nome dall'elenco delle persone (rubrica),
+     * poi il gruppo di lavoro. Il browser lo ricorda; nei moduli di nota e risposta non si riscrive più.
+     * Chi non è in elenco si aggiunge da sé e resta «da confermare» finché il team non lo conferma in bacheca. */
+    const me = () => { try { return JSON.parse(stored('dcn_me') || '{}') } catch { return {} } }
+    const setMe = (v) => store('dcn_me', JSON.stringify({ ...me(), ...v }))
+    const meContact = () => state.contacts.find((c) => c.id === me().contact) || null
+    const meGroup = () => (groupOf(me().group) ? me().group : '')
+    // il team scrive col suo utente WordPress: sceglie solo il gruppo (se ci sono gruppi)
+    const identified = () => (cfg.team ? true : !!meContact() && (!GROUPS.length || !!meGroup()))
+    const whoFields = () => ({ author: cfg.team ? cfg.user : meContact()?.name || '', contact: cfg.team ? '' : me().contact || '', group: meGroup() })
+    // vecchie versioni: il nome scritto a mano, se coincide con una persona confermata, diventa la scelta
+    const adoptOldName = () => {
+        if (cfg.team || me().contact || !savedName()) return
+        const c = state.contacts.find((x) => !x.pending && x.name.trim().toLowerCase() === savedName().trim().toLowerCase())
+        if (c) setMe({ contact: c.id, group: groupOf(stored('dcn_group')) ? stored('dcn_group') : '' })
     }
 
-    /* scelta delle persone esterne da segnalare (nel modulo di nota e in quello di risposta) */
-    const tagPicker = (label = 'Segnala a', preset = []) => {
-        const chosen = new Set(preset.filter((id) => state.contacts.some((c) => c.id === id)))
-        if (!state.contacts.length) return { el: null, value: () => [] }
-        const el = h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, label),
-            ...state.contacts.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(chosen.has(c.id)), title: c.email, onclick: (e) => {
+    /* moduli: si inviano solo col pulsante, mai con Invio (nei campi di testo Invio non fa nulla, nelle aree di testo va a capo) */
+    const form = (attrs, ...kids) => {
+        const f = h('form', { ...attrs, novalidate: true, onsubmit: (e) => e.preventDefault() }, ...kids)
+        f.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault() })
+        return f
+    }
+    // pulsante spento finché i campi obbligatori sono vuoti
+    const needs = (btn, ...fields) => {
+        const check = () => { btn.disabled = fields.some((f) => !f.value.trim()) }
+        fields.forEach((f) => f.addEventListener('input', check))
+        check()
+        return check
+    }
+
+    /* «Chi sei?»: elenco delle persone, «Non sono in elenco», poi il gruppo */
+    const renderWho = (body) => {
+        const mine = me().contact
+        const people = state.contacts.filter((c) => !c.pending || c.id === mine).sort((a, b) => a.name.localeCompare(b.name, 'it'))
+        const step = state.whoStep || (meContact() && GROUPS.length && !cfg.team ? 'group' : cfg.team ? 'group' : 'name')
+        const done = () => {
+            state.whoStep = ''
+            state.view = 'list'
+            const after = state.after
+            state.after = null
+            if (after === 'pick') startPick()
+            else renderPanel()
+        }
+        if (step === 'group') {
+            body.append(h('p', { class: 'hint-txt' }, cfg.team ? 'Con quale gruppo scrivi? Le tue note avranno il suo colore.' : 'Di che gruppo fai parte? Le tue note avranno il suo colore.'),
+                h('div', { class: 'who-list' }, ...GROUPS.map((g) => h('button', { class: `who g${meGroup() === g.id ? ' on' : ''}`, type: 'button', style: `--g:${g.color};--g-ink:${g.ink}`, onclick: () => { setMe({ group: g.id }); done() } },
+                    h('span', { class: 'dot' }), h('b', {}, g.name)))),
+                cfg.team ? h('button', { class: 'btn', type: 'button', onclick: () => { setMe({ group: '' }); done() } }, 'Nessun gruppo') : h('button', { class: 'link-btn', type: 'button', onclick: () => { state.whoStep = 'name'; renderPanel() } }, '← Cambia nome'))
+            return
+        }
+        if (step === 'new') {
+            const first = h('input', { type: 'text', placeholder: 'Nome', maxlength: 40, 'aria-label': 'Nome', autocomplete: 'given-name' })
+            const last = h('input', { type: 'text', placeholder: 'Cognome', maxlength: 40, 'aria-label': 'Cognome', autocomplete: 'family-name' })
+            const email = h('input', { type: 'email', placeholder: 'Email', maxlength: 120, 'aria-label': 'Email', autocomplete: 'email' })
+            const add = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+                add.disabled = true
+                try {
+                    const res = await api('/contacts', { method: 'POST', body: { name: `${first.value.trim()} ${last.value.trim()}`, email: email.value } })
+                    state.contacts = res.contacts
+                    setMe({ contact: res.id })
+                    state.whoStep = GROUPS.length ? 'group' : ''
+                    if (state.whoStep) renderPanel(); else done()
+                } catch (err) { toast(err.message); add.disabled = false }
+            } }, 'Aggiungimi')
+            needs(add, first, last, email)
+            body.append(h('p', { class: 'hint-txt' }, 'Scrivi nome, cognome ed email. Puoi già scrivere note; il team confermerà il tuo nome.'),
+                form({ class: 'form' }, h('div', { class: 'row' }, first, last), email, add,
+                    h('button', { class: 'link-btn', type: 'button', onclick: () => { state.whoStep = 'name'; renderPanel() } }, '← Torna all’elenco')))
+            first.focus()
+            return
+        }
+        const filter = people.length > 8 ? h('input', { class: 'who-filter', type: 'search', placeholder: 'Cerca il tuo nome…', 'aria-label': 'Cerca il tuo nome' }) : null
+        const list = h('div', { class: 'who-list' }, ...people.map((c) => h('button', { class: `who${c.id === mine ? ' on' : ''}`, type: 'button', 'data-name': c.name.toLowerCase(), onclick: () => {
+            setMe({ contact: c.id })
+            if (GROUPS.length) { state.whoStep = 'group'; renderPanel() } else done()
+        } }, h('span', { class: 'avatar' }, c.name.trim().charAt(0).toUpperCase()), h('b', {}, c.name), c.pending ? h('span', { class: 'pending' }, 'da confermare') : null)))
+        filter?.addEventListener('input', () => list.querySelectorAll('.who').forEach((b) => { b.hidden = !b.dataset.name.includes(filter.value.trim().toLowerCase()) }))
+        body.append(...[h('p', { class: 'hint-txt' }, 'Scegli il tuo nome: lo useremo per le tue note e per avvisarti quando vengono chiuse.'),
+            filter, people.length ? list : h('div', { class: 'empty' }, 'Nessun nome in elenco.'),
+            h('button', { class: 'btn', type: 'button', onclick: () => { state.whoStep = 'new'; renderPanel() } }, 'Non sono in elenco')].filter(Boolean))
+    }
+
+    /* riga fissa in cima al pannello: con che nome e gruppo si sta scrivendo */
+    const whoBar = () => {
+        if (cfg.team && !GROUPS.length) return null
+        const c = meContact()
+        return h('div', { class: 'who-bar' }, h('span', {}, 'Scrivi come ', h('b', {}, cfg.team ? `${cfg.user} (team)` : c?.name || '—'), groupChip(meGroup()),
+            !cfg.team && c?.pending ? h('span', { class: 'pending' }, 'da confermare') : null),
+        h('button', { class: 'link-btn', type: 'button', onclick: () => { state.view = 'who'; state.whoStep = cfg.team ? 'group' : 'name'; renderPanel() } }, 'Cambia'))
+    }
+
+    /* scelta delle persone esterne da segnalare. Nei moduli di nota e risposta è chiusa finché non la si apre («+ Segnala a qualcuno») */
+    const tagPicker = (label = 'Segnala a', preset = [], { pending = false, folded = false } = {}) => {
+        const people = state.contacts.filter((c) => pending || !c.pending)
+        const chosen = new Set(preset.filter((id) => people.some((c) => c.id === id)))
+        if (!people.length) return { el: null, value: () => [] }
+        const chips = h('div', { class: 'tag' }, h('span', { class: 'tag-label' }, label),
+            ...people.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(chosen.has(c.id)), title: c.email + (c.pending ? ' · da confermare' : ''), onclick: (e) => {
                 chosen.has(c.id) ? chosen.delete(c.id) : chosen.add(c.id)
                 e.currentTarget.setAttribute('aria-pressed', String(chosen.has(c.id)))
             } }, c.name)))
-        return { el, value: () => [...chosen] }
+        if (!folded) return { el: chips, value: () => [...chosen] }
+        chips.hidden = true
+        const open = h('button', { class: 'link-btn', type: 'button', onclick: () => { chips.hidden = false; open.remove() } }, '+ Segnala a qualcuno')
+        return { el: h('div', {}, open, chips), value: () => [...chosen] }
     }
 
     const toolbar = () => {
@@ -399,15 +478,9 @@
     const sendReady = async (btn) => {
         const r = state.ready
         if (r?.sent && !r.fresh && !confirm('Non ci sono nuove note dall’ultimo avviso. Inviarlo di nuovo?')) return
-        let name = cfg.user
-        if (!cfg.team) {
-            name = savedName() || (prompt('Il tuo nome') || '').trim()
-            if (!name) return
-            saveName(name)
-        }
         btn.disabled = true
         try {
-            state.ready = await api('/ready', { method: 'POST', body: { path, author: name } })
+            state.ready = await api('/ready', { method: 'POST', body: { path, ...whoFields() } })
             toast('Avviso inviato.')
         } catch (e) { toast(e.message) }
         renderPanel()
@@ -448,18 +521,19 @@
 
     /* correzione di una nota o di una risposta già inviata: solo finché la nota è aperta, per chi l'ha scritta (da questo browser) o per il team */
     const canEdit = (n, id) => n.status === 'open' && (cfg.team || !!keys()[id])
-    const editable = (n, item, tag = 'p') => {
-        const txt = h(tag, {}, item.text)
+    const editable = (n, item) => {
+        const txt = h('p', { class: 'txt' }, item.text)
         if (!canEdit(n, item.id)) return [txt, null]
         const btn = h('button', { class: 'edit', type: 'button', title: 'Correggi il testo', onclick: () => {
-            const area = h('textarea', { maxlength: 2000, required: true, 'aria-label': 'Testo corretto' }, item.text)
-            const save = h('button', { class: 'btn primary', type: 'submit' }, 'Salva')
-            const form = h('form', { class: 'form edit-form', onsubmit: async (e) => {
-                e.preventDefault()
+            const area = h('textarea', { maxlength: 2000, 'aria-label': 'Testo corretto' }, item.text)
+            const save = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
                 save.disabled = true
                 try { await api(`/items/${item.id}`, { method: 'POST', body: { text: area.value, key: keys()[item.id] || '' } }); await load(); toast('Testo corretto.') } catch (err) { toast(err.message); save.disabled = false }
-            } }, area, h('div', { class: 'row' }, save, h('button', { class: 'btn', type: 'button', onclick: () => form.replaceWith(txt) }, 'Annulla')))
-            txt.replaceWith(form)
+            } }, 'Salva')
+            needs(save, area)
+            const f = form({ class: 'form edit-form' }, area, h('div', { class: 'row' }, save, h('button', { class: 'btn', type: 'button', onclick: () => { f.replaceWith(txt); btn.hidden = false } }, 'Annulla')))
+            txt.replaceWith(f)
+            btn.hidden = true
             area.focus()
         } }, 'Modifica')
         return [txt, btn]
@@ -478,10 +552,10 @@
         }
         Object.entries(STATUS).forEach(([k, label]) => row.append(h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: () => {
             if (k === 'open') { setStatus(k); return }
-            const who = tagPicker('Avvisa via email', n.involved || [])
+            const who = tagPicker('Avvisa via email', n.involved || [], { pending: true })
             const msg = h('textarea', { placeholder: 'Messaggio (facoltativo)', maxlength: 2000, 'aria-label': 'Messaggio' })
-            const ok = h('button', { class: 'btn primary', type: 'submit' }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
-            box.replaceChildren(h('form', { class: 'form status-form', onsubmit: (e) => { e.preventDefault(); ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }) } },
+            const ok = h('button', { class: 'btn primary', type: 'button', onclick: () => { ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }) } }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
+            box.replaceChildren(form({ class: 'form status-form' },
                 h('b', {}, k === 'resolved' ? 'Chiudi la nota' : 'Prendi in carico la nota'),
                 who.el || h('p', { class: 'hint-txt' }, 'Per avvisare qualcuno via email aggiungilo tra le persone esterne (icona in alto nel pannello).'),
                 msg, h('div', { class: 'row' }, ok, h('button', { class: 'btn', type: 'button', onclick: () => box.replaceChildren() }, 'Annulla'))))
@@ -489,15 +563,20 @@
         body.append(row, box, h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
     }
 
+    // intestazione uguale per nota e risposte: nome, gruppo, «da confermare» (solo per il team), data e «Modifica» a destra
+    const whoLine = (item, edit, extra = null) => h('div', { class: 'who-line' },
+        h('span', { class: 'who-name' }, h('b', {}, item.author), item.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null, groupChip(item.group),
+            cfg.team && item.pending ? h('span', { class: 'pending', title: 'Si è aggiunto dal sito: confermalo in bacheca → Persone esterne' }, 'da confermare') : null),
+        h('span', { class: 'who-date' }, item.date + (item.edited ? ' · modificata' : '')),
+        extra, edit)
+
     const renderNote = (body) => {
         const n = state.notes.find((x) => x.id === state.current) || (state.all || []).find((x) => x.id === state.current)
         if (!n) { body.append(h('div', { class: 'empty' }, 'Nota non trovata.')); return }
         const [noteText, noteEdit] = editable(n, n)
         body.append(h('div', { class: 'note-card' },
-            h('div', { class: 'by' }, numBadge(n),
-                h('div', { class: 'by-info' },
-                    h('div', { class: 'by-name' }, n.author, n.source === 'team' ? h('span', { class: 'meta' }, ' (team)') : null, groupChip(n.group)),
-                    h('div', { class: 'by-meta' }, n.date, n.edited ? ' · modificata' : '', statusBadge(n.status), n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null, noteEdit))),
+            h('div', { class: 'note-head' }, numBadge(n), whoLine(n, noteEdit), statusBadge(n.status)),
+            n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
             noteText,
             n.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + n.tagged.join(', ')) : null,
             n.shot ? h('a', { class: 'shot', href: n.shot, target: '_blank', rel: 'noopener' }, h('img', { src: n.shot, alt: 'Screenshot della pagina al momento della nota', loading: 'lazy' })) : null
@@ -505,22 +584,23 @@
         if (cfg.team) statusBox(body, n)
         n.replies.forEach((r) => {
             const [txt, edit] = editable(n, r)
-            body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, h('b', {}, r.author), r.source === 'team' ? ' (team)' : '', groupChip(r.group), h('span', { class: 'meta' }, ' · ' + r.date + (r.edited ? ' · modificata' : '')), edit, txt, r.tagged?.length ? h('p', { class: 'tagged' }, (r.kind ? 'Avvisati via email: ' : 'Segnalata a: ') + r.tagged.join(', ')) : null))
+            body.append(h('div', { class: `reply${r.source === 'team' ? ' team' : ''}` }, whoLine(r, edit), txt,
+                r.tagged?.length ? h('p', { class: 'tagged' }, (r.kind ? 'Avvisati via email: ' : 'Segnalata a: ') + r.tagged.join(', ')) : null))
         })
-        const who = identity()
-        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, required: true, 'aria-label': 'Risposta' })
-        const send = h('button', { class: 'btn primary', type: 'submit' }, 'Rispondi')
-        const tags = tagPicker()
-        body.append(h('form', { class: 'form', onsubmit: async (e) => {
-            e.preventDefault()
+        // modulo di risposta: testo → «+ Segnala a qualcuno» (chiuso) → Rispondi
+        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, 'aria-label': 'Risposta' })
+        const tags = tagPicker('Segnala a', [], { folded: true })
+        const send = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
             send.disabled = true
             try {
-                const res = await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, tag: tags.value(), ...who.value() } })
+                const res = await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, tag: tags.value(), ...whoFields() } })
                 saveKey(res.reply, res.key)
                 await load()
                 if (cfg.autoclose) { panel.hidden = true; state.view = 'list'; renderPins(); renderPanel() }
             } catch (err) { toast(err.message); send.disabled = false }
-        } }, ...who.els, text, tags.el, send))
+        } }, 'Rispondi')
+        needs(send, text)
+        body.append(form({ class: 'form reply-form' }, text, tags.el, send))
     }
 
     /* ---------- nuova nota: scelta dell'elemento ---------- */
@@ -556,6 +636,7 @@
 
     const hint = h('div', { class: 'hint' }, 'Clicca sull’elemento da commentare ', h('button', { type: 'button', onclick: () => stopPick() }, 'Annulla'))
     function startPick() {
+        if (!identified()) { state.after = 'pick'; state.view = 'who'; panel.hidden = false; load(); return }
         panel.hidden = true
         state.picking = true
         document.head.append(pickStyle)
@@ -631,19 +712,16 @@
     /* ---------- composer ---------- */
     function openComposer(pick) {
         closeComposer()
-        const who = identity()
-        const text = h('textarea', { placeholder: 'Cosa vuoi segnalare o modificare?', maxlength: 2000, required: true, 'aria-label': 'Nota' })
+        const text = h('textarea', { placeholder: 'Cosa vuoi segnalare o modificare?', maxlength: 2000, 'aria-label': 'Nota' })
         const shot = h('input', { type: 'checkbox', checked: true })
-        const send = h('button', { class: 'btn primary', type: 'submit' }, 'Invia nota')
-        const tags = tagPicker()
-        const form = h('form', { class: 'composer', onsubmit: async (e) => {
-            e.preventDefault()
+        const tags = tagPicker('Segnala a', [], { folded: true })
+        const send = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
             send.disabled = true; send.textContent = 'Invio…'
             try {
                 const screenshot = shot.checked ? await pick.shot : ''
                 const note = await api('/notes', { method: 'POST', body: {
                     path, url: location.href.split('#')[0], selector: pick.selector, sel2: pick.sel2, anchor: pick.anchor, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
-                    vw: innerWidth, text: text.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / pick.vh, tag: tags.value(), ...who.value(),
+                    vw: innerWidth, text: text.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / pick.vh, tag: tags.value(), ...whoFields(),
                 } })
                 saveKey(note.id, note.key)
                 closeComposer()
@@ -651,18 +729,24 @@
                 await load()
                 openNote(note.id)
             } catch (err) { toast(err.message); send.disabled = false; send.textContent = 'Invia nota' }
-        } },
-            h('h3', {}, 'Nuova nota'), ...who.els, text, tags.el,
+        } }, 'Invia nota')
+        needs(send, text)
+        const who = meContact()
+        const f = form({ class: 'composer' },
+            h('h3', {}, 'Nuova nota'),
+            cfg.team && !GROUPS.length ? null : h('p', { class: 'composer-who' }, 'Come ', h('b', {}, cfg.team ? cfg.user : who?.name || ''), groupChip(meGroup())),
+            text, tags.el,
             h('label', { class: 'check' }, shot, 'Allega uno screenshot della pagina'),
             h('div', { class: 'row' }, send, h('button', { class: 'btn', type: 'button', onclick: closeComposer }, 'Annulla'))
         )
         const w = 320
-        form.style.left = Math.max(12, Math.min(innerWidth - w - 12, pick.cx + 14)) + 'px'
-        form.style.top = Math.max(12, Math.min(innerHeight - 380, pick.cy + 14)) + 'px'
-        // segnaposto provvisorio nel punto scelto
-        state.composer = { form, pick }
-        overlay.append(form)
+        f.style.left = Math.max(12, Math.min(innerWidth - w - 12, pick.cx + 14)) + 'px'
+        f.style.top = Math.max(12, Math.min(innerHeight - 330, pick.cy + 14)) + 'px'
+        state.composer = { form: f, pick }
+        overlay.append(f)
         text.focus()
+        // html2canvas apre per un attimo un iframe e il cursore esce dal campo: a cattura finita lo si rimette
+        pick.shot.then(() => { if (state.composer?.form === f && !f.contains(shadow.activeElement)) text.focus() })
     }
     function closeComposer() { state.composer?.form.remove(); state.composer = null }
 

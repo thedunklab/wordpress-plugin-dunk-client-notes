@@ -113,13 +113,56 @@ class Plugin
     }
 
     /**
-     * Persone esterne al team aggiunte dal pannello (nome ed email), da segnalare su note e risposte.
+     * Persone esterne al team (nome ed email): chi scrive sul sito si identifica con una di queste, e si possono
+     * segnalare su note e risposte. `pending` = aggiunta dal sito e non ancora confermata dal team.
      *
-     * @return array<int, array{id: string, name: string, email: string}>
+     * @return array<int, array{id: string, name: string, email: string, pending: bool}>
      */
     public static function contacts(): array
     {
-        return array_values(array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email'])));
+        $list = array_filter((array) get_option('dcn_contacts', []), static fn ($c) => is_array($c) && isset($c['id'], $c['name'], $c['email']));
+
+        return array_values(array_map(static fn ($c) => ['id' => $c['id'], 'name' => $c['name'], 'email' => $c['email'], 'pending' => !empty($c['pending'])], $list));
+    }
+
+    /**
+     * Aggiunge o aggiorna una persona della rubrica. Chi non è nel team la aggiunge in attesa di conferma;
+     * un indirizzo già confermato resta confermato. Restituisce la persona, oppure null se la rubrica è piena (50).
+     */
+    public static function add_contact(string $name, string $email, bool $confirmed): ?array
+    {
+        $email = strtolower($email);
+        $id    = substr(md5($email), 0, 10);
+        $old   = self::contact($id);
+        $list  = array_values(array_filter(self::contacts(), static fn ($c) => $c['id'] !== $id));
+        if (!$old && count($list) >= 50) {
+            return null;
+        }
+        $c      = ['id' => $id, 'name' => $name, 'email' => $email, 'pending' => !$confirmed && (!$old || $old['pending'])];
+        $list[] = $c;
+        update_option('dcn_contacts', $list, false);
+        if ($c['pending'] && !$old) {
+            $people = admin_url('admin.php?page=dcn-people');
+            self::notify('Nuova persona da confermare: ' . $name, "$name ($email) si è aggiunta dal sito e aspetta la conferma.\n\nConferma o rifiuta: $people", [
+                'title'   => 'Nuova persona da confermare',
+                'intro'   => "$name ($email) si è aggiunta dal pannello delle note e aspetta la conferma del team. Intanto può scrivere: le sue note sono segnate «da confermare».",
+                'buttons' => [['label' => 'Conferma o rifiuta', 'url' => $people, 'primary' => true]],
+            ]);
+        }
+
+        return $c;
+    }
+
+    /** Chi ha scritto è una persona aggiunta dal sito e non ancora confermata dal team? */
+    public static function is_pending(string $contact): bool
+    {
+        return $contact !== '' && !empty(self::contact($contact)['pending']);
+    }
+
+    /** Persone aggiunte dal sito e non ancora confermate. */
+    public static function pending_count(): int
+    {
+        return count(array_filter(self::contacts(), static fn ($c) => $c['pending']));
     }
 
     /**
@@ -317,6 +360,7 @@ class Plugin
                 'source' => (string) get_post_meta($r->ID, '_dcn_source', true) ?: 'client',
                 'group'  => (string) get_post_meta($r->ID, '_dcn_group', true),
                 'kind'   => (string) get_post_meta($r->ID, '_dcn_kind', true), // '' = risposta, altrimenti cambio di stato del team
+                'pending' => self::is_pending((string) get_post_meta($r->ID, '_dcn_contact', true)),
                 'text'   => wp_specialchars_decode($r->post_content, ENT_QUOTES),
                 'date'   => self::human_date($r),
                 'edited' => (bool) get_post_meta($r->ID, '_dcn_edited', true),
@@ -332,6 +376,7 @@ class Plugin
             'group'    => (string) $meta('group'),
             'edited'   => (bool) $meta('edited'),
             'involved' => self::involved($note),
+            'pending'  => self::is_pending((string) $meta('contact')),
             'text'     => wp_specialchars_decode($note->post_content, ENT_QUOTES),
             'status'   => (string) $meta('status') ?: 'open',
             'path'     => (string) $meta('path'),

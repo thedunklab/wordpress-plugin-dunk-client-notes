@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.0 — 2026-10-29
+- **«Chi sei?» una volta sola**: alla prima apertura del pannello si sceglie il proprio nome dall'elenco delle persone (non più un testo libero), poi il gruppo. Il browser lo ricorda; in cima al pannello «Scrivi come … · gruppo — Cambia». Nome e gruppo spariscono dai moduli di nota e risposta.
+- **Non sono in elenco**: chi non c'è si aggiunge con nome, cognome ed email e può scrivere subito; resta «da confermare» finché il team non lo conferma o lo rifiuta in **Note cliente → Persone esterne** (avviso in bacheca, contatore nel menu, email al team). Anche le persone aggiunte dalla rubrica del pannello da chi non è nel team restano da confermare.
+- **Niente invio con Invio**: i moduli partono solo dal pulsante, spento finché il testo è vuoto; nelle aree di testo Invio va a capo.
+- Modulo di risposta più semplice: testo → «+ Segnala a qualcuno» (chiuso finché non lo apri) → Rispondi.
+- Scheda della nota e risposte con la stessa intestazione: nome, gruppo, data, «Modifica» a destra; per il team i pulsanti di stato restano subito sotto la nota.
+
 ## 1.8.0 — 2026-10-29
 - **Gruppi di lavoro** con colore (Impostazioni → Gruppi di lavoro): chi scrive sceglie il gruppo, la puntina sul sito e quella nello screenshot prendono il suo colore. Lo stato si vede da un segno: anello bianco per «In lavorazione», spunta verde per «Risolta».
 - **Correzione di note e risposte** già inviate, solo finché la nota è aperta: chi le ha scritte dallo stesso browser, il team sempre. Il testo corretto è segnato «modificata».

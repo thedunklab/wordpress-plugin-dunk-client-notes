@@ -162,8 +162,41 @@
 
 /* correzione del testo e cambio di stato */
 .edit { margin-left: auto; padding: 0 2px; border: 0; background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
-.reply .edit { float: right; margin-top: 1px; }
 .edit-form { margin: 6px 0 10px; }
 .status-form { margin: 0 4px 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); }
 .status-form b { font-size: 13px; }
 .status-form textarea { min-height: 60px; }
+
+/* chi scrive: scelta una volta sola e riga fissa in cima al pannello */
+.who-list { display: grid; gap: 6px; margin: 6px 4px 12px; }
+.who { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2); color: var(--text); text-align: left; }
+.who:hover, .who.on { border-color: var(--accent); }
+.who b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.who .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--g); }
+.who.g.on { border-color: var(--g); }
+.who-filter { width: calc(100% - 8px); margin: 4px 4px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); color: var(--text); font: inherit; }
+.who-filter:focus { border-color: var(--accent); outline: 0; }
+.body > .btn { width: calc(100% - 8px); margin: 0 4px; }
+.who-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: rgba(18, 18, 18, .92); color: var(--muted); font-size: 12px; }
+.who-bar b { color: var(--text); }
+.link-btn { padding: 0; border: 0; background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; justify-self: start; }
+.body > .link-btn { margin: 4px 4px 0; }
+.pending { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px dashed var(--muted); border-radius: 99px; color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.5; white-space: nowrap; vertical-align: 1px; }
+
+/* scheda della nota e risposte, con la stessa intestazione */
+.note-card { margin: 6px 4px 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg2); }
+.note-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.note-head .num { margin-top: 1px; }
+.note-head .who-line { flex: 1; }
+.note-head .st { margin-top: 2px; }
+.who-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.who-name { overflow-wrap: anywhere; }
+.who-name b { font-size: 14px; }
+.reply .who-name b { font-size: 13px; }
+.who-date { color: var(--muted); font-size: 12px; }
+.note-card .txt, .reply .txt { margin: 0 0 8px; white-space: pre-wrap; font-size: 14px; }
+.reply .txt { margin: 4px 0 0; }
+.note-card .lost { margin-bottom: 8px; }
+.composer-who { margin: 0; color: var(--muted); font-size: 12px; }
+.composer-who b { color: var(--text); }
+.reply-form { margin-top: 12px; }

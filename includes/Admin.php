@@ -20,6 +20,7 @@ class Admin
         add_action('admin_post_dcn_testmail', [self::class, 'handle_testmail']);
         add_action('admin_post_dcn_contact_add', [self::class, 'handle_contact_add']);
         add_action('admin_post_dcn_contact_remove', [self::class, 'handle_contact_remove']);
+        add_action('admin_post_dcn_contact_confirm', [self::class, 'handle_contact_confirm']);
         add_action('admin_post_dcn_checkupdate', [self::class, 'handle_checkupdate']);
         add_action('admin_post_dcn_delete', [self::class, 'handle_delete']);
         add_action('admin_notices', [self::class, 'notice']);
@@ -46,7 +47,8 @@ class Admin
     {
         add_menu_page('Note del cliente', 'Note cliente', 'edit_posts', 'dcn-notes', [self::class, 'page'], 'dashicons-format-chat', 26);
         add_submenu_page('dcn-notes', 'Note del cliente', 'Tutte le note', 'edit_posts', 'dcn-notes', [self::class, 'page']);
-        add_submenu_page('dcn-notes', 'Persone esterne', 'Persone esterne', 'edit_posts', 'dcn-people', [self::class, 'people_page']);
+        $wait = Plugin::pending_count();
+        add_submenu_page('dcn-notes', 'Persone esterne', 'Persone esterne' . ($wait ? ' <span class="awaiting-mod">' . (int) $wait . '</span>' : ''), 'edit_posts', 'dcn-people', [self::class, 'people_page']);
         add_submenu_page('dcn-notes', 'Novità e aggiornamenti', 'Novità', 'manage_options', 'dcn-updates', [self::class, 'updates_page']);
         add_submenu_page('dcn-notes', 'Impostazioni note', 'Impostazioni', 'manage_options', 'dcn-settings', [self::class, 'settings_page']);
     }
@@ -71,6 +73,10 @@ class Admin
             echo $res === 'ok'
                 ? '<div class="notice notice-success"><p>Email di prova inviata: controlla la posta (anche lo spam).</p></div>'
                 : '<div class="notice notice-error"><p><strong>Invio non riuscito:</strong> ' . esc_html((string) $res) . '</p></div>';
+        }
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if (current_user_can('edit_posts') && ($n = Plugin::pending_count()) && (!$screen || $screen->id !== 'note-cliente_page_dcn-people')) {
+            echo '<div class="notice notice-info"><p><strong>Note cliente:</strong> ' . ($n === 1 ? '1 persona aggiunta dal sito aspetta' : (int) $n . ' persone aggiunte dal sito aspettano') . ' la conferma. <a href="' . esc_url(admin_url('admin.php?page=dcn-people')) . '">Conferma o rifiuta</a></p></div>';
         }
         if (Plugin::enabled() && current_user_can('manage_options') && (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'production') && !defined('DUNK_NOTES_ENABLED')) {
             echo '<div class="notice notice-warning"><p><strong>Note cliente attive.</strong> Ricordati di disattivarle prima di mettere il sito online (Note cliente → Impostazioni).</p></div>';
@@ -141,8 +147,34 @@ class Admin
             <h1>Persone esterne</h1>
             <?php if ($msg === 'added') : ?><div class="notice notice-success is-dismissible"><p>Persona aggiunta.</p></div><?php endif; ?>
             <?php if ($msg === 'removed') : ?><div class="notice notice-success is-dismissible"><p>Persona rimossa.</p></div><?php endif; ?>
+            <?php if ($msg === 'confirmed') : ?><div class="notice notice-success is-dismissible"><p>Persona confermata.</p></div><?php endif; ?>
+            <?php if ($msg === 'rejected') : ?><div class="notice notice-success is-dismissible"><p>Persona rifiutata: è stata tolta dalla rubrica. Le sue note restano, con il nome che aveva scritto.</p></div><?php endif; ?>
             <?php if ($msg === 'invalid') : ?><div class="notice notice-error is-dismissible"><p>Inserisci nome e cognome e un indirizzo email valido.</p></div><?php endif; ?>
-            <p class="description" style="max-width:640px">Chi è fuori dal team e puoi coinvolgere sulle note: scrivendo una nota o una risposta (anche dal pannello sul sito) si possono segnalare a queste persone, che ricevono una email con il testo e il link. Non sono utenti di WordPress e non hanno accesso alla bacheca.</p>
+            <p class="description" style="max-width:640px">Chi è fuori dal team e lavora sulle note: sul sito ognuno sceglie il proprio nome da questo elenco prima di scrivere, e si può segnalare una nota o una risposta a queste persone, che ricevono una email con il testo e il link. Non sono utenti di WordPress e non hanno accesso alla bacheca.</p>
+            <?php $pending = array_filter($people, static fn ($c) => $c['pending']); if ($pending) : ?>
+                <h2>Da confermare</h2>
+                <p class="description" style="max-width:640px">Si sono aggiunte dal pannello sul sito con «Non sono in elenco». Intanto possono già scrivere: le loro note sono segnate «da confermare». Conferma chi conosci; rifiutando, la persona viene tolta dalla rubrica.</p>
+                <table class="wp-list-table widefat striped" style="max-width:760px;margin-bottom:20px">
+                    <thead><tr><th>Nome e cognome</th><th>Email</th><th style="width:220px"></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($pending as $c) : ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($c['name']); ?></strong></td>
+                            <td><a href="mailto:<?php echo esc_attr($c['email']); ?>"><?php echo esc_html($c['email']); ?></a></td>
+                            <td>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;gap:6px">
+                                    <?php wp_nonce_field('dcn_contact_confirm_' . $c['id']); ?>
+                                    <input type="hidden" name="action" value="dcn_contact_confirm"><input type="hidden" name="cid" value="<?php echo esc_attr($c['id']); ?>">
+                                    <button class="button button-primary" name="do" value="confirm">Conferma</button>
+                                    <button class="button button-link-delete" name="do" value="reject" onclick="return confirm('Rifiutare e togliere questa persona dalla rubrica?')">Rifiuta</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <h2>Rubrica</h2>
+            <?php endif; $people = array_filter($people, static fn ($c) => !$c['pending']); ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0">
                 <?php wp_nonce_field('dcn_contact_add'); ?>
                 <input type="hidden" name="action" value="dcn_contact_add">
@@ -185,15 +217,30 @@ class Admin
         $email = sanitize_email(wp_unslash((string) ($_POST['email'] ?? '')));
         $msg   = 'invalid';
         if ($name !== '' && is_email($email)) {
-            $id   = substr(md5(strtolower($email)), 0, 10);
-            $list = array_values(array_filter(Plugin::contacts(), static fn ($c) => $c['id'] !== $id));
-            if (count($list) < 50) {
-                $list[] = ['id' => $id, 'name' => $name, 'email' => strtolower($email)];
-                update_option('dcn_contacts', $list, false);
-                $msg = 'added';
-            }
+            $msg = Plugin::add_contact($name, $email, true) ? 'added' : 'invalid';
         }
         wp_safe_redirect(admin_url('admin.php?page=dcn-people&msg=' . $msg));
+        exit;
+    }
+
+    /** Conferma (o rifiuta, cioè toglie dalla rubrica) una persona aggiunta dal sito. Lo può fare chi è nel team. */
+    public static function handle_contact_confirm(): void
+    {
+        $id = sanitize_key((string) ($_POST['cid'] ?? ''));
+        if (!current_user_can('edit_posts')) {
+            wp_die('Permesso negato.');
+        }
+        check_admin_referer('dcn_contact_confirm_' . $id);
+        $reject = ($_POST['do'] ?? '') === 'reject';
+        $list   = [];
+        foreach (Plugin::contacts() as $c) {
+            if ($c['id'] === $id && $reject) {
+                continue;
+            }
+            $list[] = $c['id'] === $id ? ['pending' => false] + $c : $c;
+        }
+        update_option('dcn_contacts', $list, false);
+        wp_safe_redirect(admin_url('admin.php?page=dcn-people&msg=' . ($reject ? 'rejected' : 'confirmed')));
         exit;
     }
 
@@ -435,7 +482,7 @@ class Admin
                         <td><a href="<?php echo esc_url(admin_url('admin.php?page=dcn-notes&note=' . $n['id'])); ?>"><strong><?php echo esc_html(wp_trim_words($n['text'], 18)); ?></strong></a>
                             <?php if ($n['replies']) : ?><br><small><?php echo count($n['replies']); ?> rispost<?php echo count($n['replies']) === 1 ? 'a' : 'e'; ?></small><?php endif; ?></td>
                         <td><code><?php echo esc_html($n['path']); ?></code></td>
-                        <td><?php echo esc_html($n['author']); ?><?php echo $n['source'] === 'team' ? ' <small>(team)</small>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?></td>
+                        <td><?php echo esc_html($n['author']); ?><?php echo $n['source'] === 'team' ? ' <small>(team)</small>' : ''; ?><?php echo $n['pending'] ? ' <small><em>(da confermare)</em></small>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?></td>
                         <td><?php echo self::badge($n['status']); // già escapato ?></td>
                         <td><?php echo esc_html($n['date']); ?></td>
                     </tr>
@@ -476,7 +523,7 @@ class Admin
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;margin-top:16px;max-width:1200px">
                 <div>
                     <div class="postbox" style="padding:16px 20px">
-                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['source'] === 'team' ? ' (team)' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
+                        <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['source'] === 'team' ? ' (team)' : ''; ?><?php echo $n['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($n['group']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
                         <p style="font-size:15px;white-space:pre-wrap"><?php echo esc_html($n['text']); ?></p>
                         <p><a class="button button-primary" href="<?php echo esc_url($view); ?>" target="_blank" rel="noopener">Apri la pagina nel punto della nota</a> <code><?php echo esc_html($n['path']); ?></code></p>
                         <?php if ($n['shot']) : ?><p><a href="<?php echo esc_url($n['shot']); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($n['shot']); ?>" alt="Screenshot" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:8px"></a></p><?php endif; ?>
@@ -484,7 +531,7 @@ class Admin
                     <h2>Conversazione</h2>
                     <?php foreach ($n['replies'] as $r) : ?>
                         <div class="postbox" style="padding:10px 16px;<?php echo $r['source'] === 'team' ? 'border-left:4px solid #fee000' : ''; ?>">
-                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?><?php echo self::group_badge($r['group']); // già escapato ?> · <small><?php echo esc_html($r['date']); ?><?php echo $r['edited'] ? ' · modificata' : ''; ?></small>
+                            <strong><?php echo esc_html($r['author']); ?></strong><?php echo $r['source'] === 'team' ? ' (team)' : ''; ?><?php echo $r['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($r['group']); // già escapato ?> · <small><?php echo esc_html($r['date']); ?><?php echo $r['edited'] ? ' · modificata' : ''; ?></small>
                             <?php if ($r['tagged']) : ?><br><small>Avvisati via email: <?php echo esc_html(implode(', ', $r['tagged'])); ?></small><?php endif; ?>
                             <p style="white-space:pre-wrap;margin-bottom:0"><?php echo esc_html($r['text']); ?></p>
                         </div>
@@ -505,7 +552,7 @@ class Admin
                             <?php $people = Plugin::contacts(); if ($people) : ?>
                                 <p style="margin:0 0 6px"><strong>Avvisa via email</strong> <span class="description">(per «In lavorazione» e «Risolta»)</span></p>
                                 <?php foreach ($people as $c) : ?>
-                                    <label style="display:block;margin:0 0 4px"><input type="checkbox" name="notify[]" value="<?php echo esc_attr($c['id']); ?>" <?php checked(in_array($c['id'], $n['involved'], true)); ?>> <?php echo esc_html($c['name']); ?> <span class="description">· <?php echo esc_html($c['email']); ?></span></label>
+                                    <label style="display:block;margin:0 0 4px"><input type="checkbox" name="notify[]" value="<?php echo esc_attr($c['id']); ?>" <?php checked(in_array($c['id'], $n['involved'], true)); ?>> <?php echo esc_html($c['name']); ?><?php echo $c['pending'] ? ' <em>(da confermare)</em>' : ''; ?> <span class="description">· <?php echo esc_html($c['email']); ?></span></label>
                                 <?php endforeach; ?>
                                 <textarea name="text" rows="2" class="large-text" placeholder="Messaggio (facoltativo)" style="margin:6px 0 8px"></textarea>
                             <?php else : ?>

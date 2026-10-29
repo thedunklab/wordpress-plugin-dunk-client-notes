@@ -295,16 +295,13 @@ class Rest
         if ($name === '' || !is_email($email)) {
             return new \WP_Error('dcn_contact', 'Inserisci nome e cognome e un indirizzo email valido.', ['status' => 400]);
         }
-        $list = Plugin::contacts();
-        $id   = substr(md5(strtolower($email)), 0, 10);
-        $list = array_values(array_filter($list, static fn ($c) => $c['id'] !== $id));
-        if (count($list) >= 50) {
+        // dal sito la persona resta in attesa finché il team non la conferma (in bacheca → Persone esterne)
+        $c = Plugin::add_contact($name, $email, self::is_team());
+        if (!$c) {
             return new \WP_Error('dcn_contact_max', 'Hai raggiunto il numero massimo di persone (50).', ['status' => 400]);
         }
-        $list[] = ['id' => $id, 'name' => $name, 'email' => strtolower($email)];
-        update_option('dcn_contacts', $list, false);
 
-        return new \WP_REST_Response($list, 201);
+        return new \WP_REST_Response(['contacts' => Plugin::contacts(), 'id' => $c['id']], 201);
     }
 
     /**
@@ -416,6 +413,10 @@ class Rest
     {
         if (self::is_team()) {
             return wp_get_current_user()->display_name;
+        }
+        // chi scrive si identifica con una persona della rubrica: il nome è il suo, non un testo libero
+        if ($c = Plugin::contact(self::contact_id($r))) {
+            return $c['name'];
         }
         $name = mb_substr(trim(sanitize_text_field((string) $r->get_param('author'))), 0, 60);
 
