@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.0 — 2026-10-31
+- **Frecce ‹ ›** nella scheda della nota: si passa alla nota precedente o successiva dell'elenco (stessa tab «Pagina/Tutte», stessi filtri, stesso ordine), con la posizione (es. «2/6»). In «Tutte» una nota di un'altra pagina apre quella pagina.
+- **Bozze conservate**: tornando a una nota si ritrovano la risposta non inviata, le persone scelte in «Segnala a» e, per il team, il modulo «In lavorazione/Risolta» aperto con persone e messaggio. Valgono finché la scheda del browser è aperta, anche cambiando pagina; si cancellano all'invio o con «Annulla».
+- Tornando all'elenco con ← restano tab, filtro «Risolte» e punto di scorrimento; l'ultima nota aperta è evidenziata.
+
 ## 1.10.0 — 2026-10-29
 - **Il team scrive come team**: chi è loggato in WordPress non sceglie più un gruppo del cliente; scrive con l'etichetta del team (Impostazioni → **Nome del team**, di base «DUNK»), con puntine nere e numero giallo. Anche le note del team già scritte passano a questa etichetta.
 - **Gruppo predefinito «Cliente»**: un sito senza gruppi propri usa il gruppo «Cliente» (giallo, modificabile in Impostazioni). Con un solo gruppo il cliente non deve scegliere nulla e il filtro «Solo …» non compare; le note del cliente scritte prima dei gruppi risultano «Cliente».

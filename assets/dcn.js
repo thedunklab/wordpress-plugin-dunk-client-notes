@@ -42,6 +42,28 @@
     // chiavi per correggere ciò che si è scritto da questo browser (id nota/risposta → chiave)
     const keys = () => { try { return JSON.parse(stored('dcn_keys') || '{}') } catch { return {} } }
     const saveKey = (id, key) => { if (!key) return; const k = keys(); k[id] = key; store('dcn_keys', JSON.stringify(k)) }
+    // memoria della sessione (sessionStorage): sopravvive al cambio di pagina, sparisce chiudendo la scheda
+    const session = (k, v) => {
+        try {
+            if (v === undefined) return JSON.parse(sessionStorage.getItem(k) || 'null')
+            sessionStorage.setItem(k, JSON.stringify(v))
+        } catch { return null }
+    }
+
+    /* bozze per nota: risposta non inviata, persone di «Segnala a» e modulo di cambio stato aperto.
+     * Passando a un'altra nota (frecce o elenco) e tornando indietro si ritrovano com'erano. */
+    const drafts = session('dcn_drafts') || {}
+    const draftOf = (id) => drafts[id] || {}
+    const setDraft = (id, v) => {
+        const d = { ...draftOf(id), ...v }
+        if (!d.text && !d.tags?.length && !d.status) delete drafts[id]
+        else drafts[id] = d
+        session('dcn_drafts', drafts)
+    }
+    // filtri dell'elenco e posizione di scorrimento (per tab), anche dopo il passaggio a una nota di un'altra pagina
+    const listMemo = session('dcn_list') || {}
+    Object.assign(state, { tab: listMemo.tab || 'page', resolved: !!listMemo.resolved, scroll: listMemo.scroll || {} })
+    const saveList = () => session('dcn_list', { tab: state.tab, resolved: state.resolved, scroll: state.scroll })
 
     /* gruppi di lavoro (Impostazioni): colore delle puntine */
     const GROUPS = cfg.groups || []
@@ -305,6 +327,7 @@
         const head = h('div', { class: 'head' },
             state.view === 'note' || (who && identified()) ? h('button', { class: 'icon', type: 'button', 'aria-label': 'Indietro', onclick: () => { state.view = 'list'; state.whoStep = ''; renderPins(); renderPanel() } }, '←') : null,
             h('h2', {}, state.view === 'note' ? 'Nota' : state.view === 'contacts' ? 'Persone esterne' : who ? 'Chi sei?' : `Note · ${cfg.label}`),
+            state.view === 'note' && state.loaded ? stepper() : null,
             h('button', { class: 'icon', type: 'button', 'aria-label': 'Chiudi', onclick: () => { panel.hidden = true } }, '✕')
         )
         const body = h('div', { class: 'body' })
@@ -437,7 +460,7 @@
     }
 
     /* scelta delle persone esterne da segnalare. Nei moduli di nota e risposta è chiusa finché non la si apre («+ Segnala a qualcuno») */
-    const tagPicker = (label = 'Segnala a', preset = [], { pending = false, folded = false } = {}) => {
+    const tagPicker = (label = 'Segnala a', preset = [], { pending = false, folded = false, onChange = null } = {}) => {
         const people = state.contacts.filter((c) => pending || !c.pending)
         const chosen = new Set(preset.filter((id) => people.some((c) => c.id === id)))
         if (!people.length) return { el: null, value: () => [] }
@@ -445,8 +468,10 @@
             ...people.map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(chosen.has(c.id)), title: c.email + (c.pending ? ' · da confermare' : ''), onclick: (e) => {
                 chosen.has(c.id) ? chosen.delete(c.id) : chosen.add(c.id)
                 e.currentTarget.setAttribute('aria-pressed', String(chosen.has(c.id)))
+                onChange?.([...chosen])
             } }, c.name)))
-        if (!folded) return { el: chips, value: () => [...chosen] }
+        // già aperta se la bozza aveva delle persone scelte
+        if (!folded || chosen.size) return { el: chips, value: () => [...chosen] }
         chips.hidden = true
         const open = h('button', { class: 'link-btn', type: 'button', onclick: () => { chips.hidden = false; open.remove() } }, '+ Segnala a qualcuno')
         return { el: h('div', {}, open, chips), value: () => [...chosen] }
@@ -461,8 +486,8 @@
                 h('button', { class: 'btn primary', type: 'button', onclick: startPick }, '+ Nuova nota'),
                 h('div', { class: 'tools-right' },
                     h('div', { class: 'tabs', role: 'tablist' },
-                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page' && state.view !== 'contacts'), onclick: () => { state.tab = 'page'; state.view = 'list'; renderPanel() } }, 'Pagina'),
-                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all' && state.view !== 'contacts'), onclick: () => { state.tab = 'all'; state.view = 'list'; renderPanel() } }, 'Tutte')
+                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'page' && state.view !== 'contacts'), onclick: () => { state.tab = 'page'; state.view = 'list'; saveList(); renderPanel() } }, 'Pagina'),
+                        h('button', { class: 'tab', role: 'tab', 'aria-selected': String(state.tab === 'all' && state.view !== 'contacts'), onclick: () => { state.tab = 'all'; state.view = 'list'; saveList(); renderPanel() } }, 'Tutte')
                     ),
                     h('button', { class: `icon-btn${state.view === 'contacts' ? ' on' : ''}`, type: 'button', title: 'Persone esterne da segnalare', 'aria-label': 'Persone esterne da segnalare', 'aria-pressed': String(state.view === 'contacts'),
                         onclick: () => { state.view = state.view === 'contacts' ? 'list' : 'contacts'; renderPanel() } },
@@ -472,7 +497,7 @@
             h('div', { class: 'tools-row sub' },
                 // filtri come pulsantini uguali a sinistra, conteggio a destra: tutto su una riga
                 h('div', { class: 'filters' },
-                    h('button', { class: 'chip', type: 'button', 'aria-pressed': String(!!state.resolved), title: 'Mostra anche le note risolte', onclick: () => { state.resolved = !state.resolved; render() } }, 'Risolte'),
+                    h('button', { class: 'chip', type: 'button', 'aria-pressed': String(!!state.resolved), title: 'Mostra anche le note risolte', onclick: () => { state.resolved = !state.resolved; saveList(); render() } }, 'Risolte'),
                     GROUPS.length > 1 && meGroup() ? h('button', { class: 'chip g', type: 'button', style: `--g:${groupOf(meGroup()).color};--g-ink:${groupOf(meGroup()).ink}`, 'aria-pressed': String(onlyMine()), title: 'Mostra solo le note del tuo gruppo, nell’elenco e sulla pagina',
                         onclick: () => { store('dcn_only_group', onlyMine() ? '' : '1'); render() } }, 'Solo ' + groupOf(meGroup()).name) : null),
                 h('span', { class: 'count', title: `${open} apert${open === 1 ? 'a' : 'e'}, ${done} risolt${done === 1 ? 'a' : 'e'}` }, `${open} apert${open === 1 ? 'a' : 'e'}${done ? ` · ${done} risolt${done === 1 ? 'a' : 'e'}` : ''}`)
@@ -505,15 +530,31 @@
         renderPanel()
     }
 
+    // le note come le mostra l'elenco: stessa tab, stessi filtri, stesso ordine (le più recenti prima)
+    const listed = () => (state.tab === 'all' ? (state.all || []) : state.notes).filter(shown).slice().sort((a, b) => b.id - a.id)
+    // una nota di un'altra pagina si apre andando su quella pagina
+    const goTo = (n) => (n.path === path ? openNote(n.id) : (location.href = n.url ? `${n.url.split('#')[0]}#dcn-${n.id}` : `${n.path}#dcn-${n.id}`))
+
+    /* frecce ‹ › nella testata della nota: precedente e successiva nell'elenco. Se la nota aperta non è (più) nell'elenco,
+     * ad esempio appena risolta con «Risolte» spento, le frecce portano alle vicine per ordine */
+    const stepper = () => {
+        const list = listed()
+        const i = list.findIndex((x) => x.id === state.current)
+        const prev = i >= 0 ? list[i - 1] : list.filter((x) => x.id > state.current).pop()
+        const next = i >= 0 ? list[i + 1] : list.find((x) => x.id < state.current)
+        const arrow = (n, label, sign) => h('button', { class: 'icon step', type: 'button', 'aria-label': label, title: n ? `${label}: nota ${n.n}${n.path !== path ? ' (' + n.path + ')' : ''}` : label, disabled: !n, onclick: () => n && goTo(n) }, sign)
+        return h('div', { class: 'stepper' }, arrow(prev, 'Nota precedente', '‹'),
+            h('span', { class: 'step-pos' }, i >= 0 ? `${i + 1}/${list.length}` : `–/${list.length}`), arrow(next, 'Nota successiva', '›'))
+    }
+
     const renderList = (body) => {
-        const src = state.tab === 'all' ? (state.all || []) : state.notes
-        const list = src.filter(shown).slice().sort((a, b) => b.id - a.id)
+        const list = listed()
         if (!list.length) {
             body.append(h('div', { class: 'empty' }, onlyMine() ? `Nessuna nota del gruppo ${groupOf(meGroup()).name}${state.tab === 'all' ? ' nel sito' : ' su questa pagina'}. Togli il filtro «Solo ${groupOf(meGroup()).name}» per vederle tutte.`
                 : state.tab === 'all' ? 'Nessuna nota nel sito.' : 'Nessuna nota su questa pagina. Premi «Nuova nota», poi clicca sul punto da commentare.'))
             return
         }
-        list.forEach((n) => body.append(h('button', { class: 'item', type: 'button', onclick: () => (n.path === path ? openNote(n.id) : (location.href = n.url ? `${n.url.split('#')[0]}#dcn-${n.id}` : `${n.path}#dcn-${n.id}`)) },
+        list.forEach((n) => body.append(h('button', { class: `item${n.id === state.current ? ' last' : ''}`, type: 'button', onclick: () => goTo(n) },
             numBadge(n),
             h('span', { class: 'item-body' },
                 h('span', { class: 'txt' }, n.text),
@@ -525,6 +566,10 @@
                     n.status !== 'open' ? statusBadge(n.status) : null)
             )
         )))
+        // tornando all'elenco si riparte dal punto in cui lo si era lasciato
+        const tab = state.tab
+        body.scrollTop = state.scroll[tab] || 0
+        body.addEventListener('scroll', () => { state.scroll[tab] = body.scrollTop; saveList() }, { passive: true })
     }
 
     const openNote = (id) => {
@@ -566,20 +611,27 @@
         const setStatus = async (k, extra = {}) => {
             try {
                 const res = await api(`/notes/${n.id}/status`, { method: 'POST', body: { status: k, ...extra } })
+                setDraft(n.id, { status: null })
                 await load()
                 toast(res.notified?.length ? `Email inviata a ${res.notified.join(', ')}.` : `Stato: ${STATUS[k].toLowerCase()}.`)
             } catch (e) { toast(e.message) }
         }
-        Object.entries(STATUS).forEach(([k, label]) => row.append(h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: () => {
-            if (k === 'open') { setStatus(k); return }
-            const who = tagPicker('Avvisa via email', n.involved || [], { pending: true })
-            const msg = h('textarea', { placeholder: 'Messaggio (facoltativo)', maxlength: 2000, 'aria-label': 'Messaggio' })
+        // il modulo aperto (stato scelto, persone, messaggio) resta nella bozza della nota
+        const openForm = (k) => {
+            const d = draftOf(n.id).status?.k === k ? draftOf(n.id).status : { k, notify: n.involved || [], text: '' }
+            setDraft(n.id, { status: d })
+            const keep = (v) => setDraft(n.id, { status: { ...draftOf(n.id).status, ...v } })
+            const who = tagPicker('Avvisa via email', d.notify, { pending: true, onChange: (notify) => keep({ notify }) })
+            const msg = h('textarea', { placeholder: 'Messaggio (facoltativo)', maxlength: 2000, 'aria-label': 'Messaggio', oninput: () => keep({ text: msg.value }) }, d.text)
             const ok = h('button', { class: 'btn primary', type: 'button', onclick: () => { ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }) } }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
             box.replaceChildren(form({ class: 'form status-form' },
                 h('b', {}, k === 'resolved' ? 'Chiudi la nota' : 'Prendi in carico la nota'),
                 who.el || h('p', { class: 'hint-txt' }, 'Per avvisare qualcuno via email aggiungilo tra le persone esterne (icona in alto nel pannello).'),
-                msg, h('div', { class: 'row' }, ok, h('button', { class: 'btn', type: 'button', onclick: () => box.replaceChildren() }, 'Annulla'))))
-        } }, label)))
+                msg, h('div', { class: 'row' }, ok, h('button', { class: 'btn', type: 'button', onclick: () => { setDraft(n.id, { status: null }); box.replaceChildren() } }, 'Annulla'))))
+        }
+        Object.entries(STATUS).forEach(([k, label]) => row.append(h('button', { class: `btn${n.status === k ? ' primary' : ''}`, type: 'button', onclick: () => (k === 'open' ? setStatus(k) : openForm(k)) }, label)))
+        const d = draftOf(n.id).status
+        if (d && STATUS[d.k] && d.k !== 'open') openForm(d.k)
         body.append(row, box, h('p', { class: 'link' }, h('a', { href: `${cfg.admin}&note=${n.id}`, target: '_blank', rel: 'noopener' }, 'Apri in bacheca')))
     }
 
@@ -608,12 +660,15 @@
                 r.tagged?.length ? h('p', { class: 'tagged' }, (r.kind ? 'Avvisati via email: ' : 'Segnalata a: ') + r.tagged.join(', ')) : null))
         })
         // modulo di risposta: testo → «+ Segnala a qualcuno» (chiuso) → Rispondi
-        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, 'aria-label': 'Risposta' })
-        const tags = tagPicker('Segnala a', [], { folded: true })
+        // testo e persone restano nella bozza della nota finché la risposta non parte
+        const draft = draftOf(n.id)
+        const text = h('textarea', { placeholder: 'Scrivi una risposta…', maxlength: 2000, 'aria-label': 'Risposta', oninput: () => setDraft(n.id, { text: text.value }) }, draft.text || '')
+        const tags = tagPicker('Segnala a', draft.tags || [], { folded: true, onChange: (v) => setDraft(n.id, { tags: v }) })
         const send = h('button', { class: 'btn primary', type: 'button', onclick: async () => {
             send.disabled = true
             try {
                 const res = await api(`/notes/${n.id}/replies`, { method: 'POST', body: { text: text.value, tag: tags.value(), ...whoFields() } })
+                setDraft(n.id, { text: '', tags: [] })
                 saveKey(res.reply, res.key)
                 await load()
                 if (cfg.autoclose) { panel.hidden = true; state.view = 'list'; renderPins(); renderPanel() }

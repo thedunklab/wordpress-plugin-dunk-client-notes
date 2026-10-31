@@ -22,6 +22,10 @@
 .head h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 700; }
 .icon { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 18px; }
 .icon:hover { background: var(--bg3); color: var(--text); }
+.stepper { display: flex; align-items: center; gap: 2px; }
+.icon.step { width: 28px; height: 28px; font-size: 22px; line-height: 1; }
+.icon.step:disabled { opacity: .3; background: transparent; color: var(--muted); cursor: default; }
+.step-pos { min-width: 34px; color: var(--muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
 .tools { display: grid; gap: 8px; padding: 10px 14px 10px; border-bottom: 1px solid var(--line); background: rgba(18, 18, 18, .92); }
 .tools-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tools-row.sub { min-height: 22px; }
@@ -53,6 +57,7 @@
 /* elenco */
 .item { display: flex; gap: 10px; width: 100%; margin: 4px 0; padding: 10px; border: 1px solid transparent; border-radius: 12px; background: transparent; text-align: left; }
 .item:hover { border-color: var(--line); background: var(--bg2); }
+.item.last { border-color: var(--line); }
 .num { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1.5px solid var(--accent); border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700; line-height: 1; padding-top: 2px; }
 .num.progress { background: var(--bg3); color: var(--accent); }
 .num.resolved { border-color: var(--done); background: var(--done); color: var(--accent-ink); }
