@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.11.1 — 2026-11-13
+- Se il server rifiuta una richiesta (401/403, di solito sessione WordPress scaduta) il pannello lo dice chiaramente invece di «Errore di rete»; nel cambio di stato il pulsante torna attivo per riprovare.
+
 ## 1.11.0 — 2026-10-31
 - **Frecce ‹ ›** nella scheda della nota: si passa alla nota precedente o successiva dell'elenco (stessa tab «Pagina/Tutte», stessi filtri, stesso ordine), con la posizione (es. «2/6»). In «Tutte» una nota di un'altra pagina apre quella pagina.
 - **Bozze conservate**: tornando a una nota si ritrovano la risposta non inviata, le persone scelte in «Segnala a» e, per il team, il modulo «In lavorazione/Risolta» aperto con persone e messaggio. Valgono finché la scheda del browser è aperta, anche cambiando pagina; si cancellano all'invio o con «Annulla».

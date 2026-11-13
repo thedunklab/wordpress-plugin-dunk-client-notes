@@ -32,6 +32,7 @@
             credentials: 'same-origin',
         })
         const json = await res.json().catch(() => ({}))
+        if (res.status === 401 || res.status === 403) throw new Error('Richiesta rifiutata: la sessione potrebbe essere scaduta. Ricarica la pagina e accedi di nuovo.')
         if (!res.ok) throw new Error(json.message || 'Errore di rete')
         return json
     }
@@ -608,13 +609,13 @@
     const statusBox = (body, n) => {
         const row = h('div', { class: 'status-row' })
         const box = h('div')
-        const setStatus = async (k, extra = {}) => {
+        const setStatus = async (k, extra = {}, retry = null) => {
             try {
                 const res = await api(`/notes/${n.id}/status`, { method: 'POST', body: { status: k, ...extra } })
                 setDraft(n.id, { status: null })
                 await load()
                 toast(res.notified?.length ? `Email inviata a ${res.notified.join(', ')}.` : `Stato: ${STATUS[k].toLowerCase()}.`)
-            } catch (e) { toast(e.message) }
+            } catch (e) { toast(e.message); if (retry) retry() }
         }
         // il modulo aperto (stato scelto, persone, messaggio) resta nella bozza della nota
         const openForm = (k) => {
@@ -623,7 +624,7 @@
             const keep = (v) => setDraft(n.id, { status: { ...draftOf(n.id).status, ...v } })
             const who = tagPicker('Avvisa via email', d.notify, { pending: true, onChange: (notify) => keep({ notify }) })
             const msg = h('textarea', { placeholder: 'Messaggio (facoltativo)', maxlength: 2000, 'aria-label': 'Messaggio', oninput: () => keep({ text: msg.value }) }, d.text)
-            const ok = h('button', { class: 'btn primary', type: 'button', onclick: () => { ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }) } }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
+            const ok = h('button', { class: 'btn primary', type: 'button', onclick: () => { ok.disabled = true; setStatus(k, { notify: who.value(), text: msg.value }, () => { ok.disabled = false }) } }, k === 'resolved' ? 'Segna come risolta' : 'Metti in lavorazione')
             box.replaceChildren(form({ class: 'form status-form' },
                 h('b', {}, k === 'resolved' ? 'Chiudi la nota' : 'Prendi in carico la nota'),
                 who.el || h('p', { class: 'hint-txt' }, 'Per avvisare qualcuno via email aggiungilo tra le persone esterne (icona in alto nel pannello).'),
