@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.10.1 — 2026-11-13
+- Se il server rifiuta una richiesta (401/403, di solito sessione WordPress scaduta) il pannello lo dice chiaramente invece di «Errore di rete»; nel cambio di stato il pulsante torna attivo per riprovare.
+
 ## 1.10.0 — 2026-10-29
 - **Il team scrive come team**: chi è loggato in WordPress non sceglie più un gruppo del cliente; scrive con l'etichetta del team (Impostazioni → **Nome del team**, di base «DUNK»), con puntine nere e numero giallo. Anche le note del team già scritte passano a questa etichetta.
 - **Gruppo predefinito «Cliente»**: un sito senza gruppi propri usa il gruppo «Cliente» (giallo, modificabile in Impostazioni). Con un solo gruppo il cliente non deve scegliere nulla e il filtro «Solo …» non compare; le note del cliente scritte prima dei gruppi risultano «Cliente».
