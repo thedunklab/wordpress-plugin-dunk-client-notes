@@ -136,7 +136,7 @@ class Rest
             update_post_meta($id, '_dcn_shot', $shot);
         }
 
-        $link = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $id;
+        $link = Plugin::page_url($path, $id);
         Plugin::notify('Nuova nota #' . $n . ' su ' . $path, "$author ha scritto:\n\n$text\n\nApri la nota: $link\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $id), [
             'title'   => 'Nuova nota #' . $n,
             'intro'   => "$author ha scritto una nota sulla pagina $path.",
@@ -359,7 +359,7 @@ class Rest
             $lines[] = sprintf('#%d%s · %s: %s', (int) get_post_meta($p->ID, '_dcn_n', true), $prev && !in_array($p->ID, $prev, true) ? ' (nuova)' : '', get_post_meta($p->ID, '_dcn_author', true), mb_substr(str_replace(["\r", "\n"], ' ', $p->post_content), 0, 140));
         }
         $count = count($notes);
-        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path)));
+        $link  = Plugin::page_url($path);
         $list  = admin_url('admin.php?page=dcn-notes&status=open&path=' . rawurlencode($path));
 
         $body = "Ciao,\n\n$author ha segnalato che le note della pagina $path sono pronte per essere messe in lavorazione (" . ($count === 1 ? '1 nota aperta' : "$count note aperte") . ").\n\n"

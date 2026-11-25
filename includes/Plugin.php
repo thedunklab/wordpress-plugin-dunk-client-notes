@@ -104,7 +104,36 @@ class Plugin
             'fab'    => ['side' => get_option('dcn_fab_side', 'right') === 'left' ? 'left' : 'right', 'bottom' => (int) get_option('dcn_fab_bottom', 0)], // posizione del pulsante (per non coprire altri widget, es. Iubenda)
             'css'    => $css,
             'font'   => DCN_URL . 'assets/fonts/dm-sans-latin-wght-normal.woff2',
+            'langs'  => self::languages(), // sito multilingua: etichetta della lingua sulle note in «Tutte»
         ]) . ';', 'before');
+    }
+
+    /**
+     * Lingue attive del sito (WPML o Polylang), la predefinita per prima; [] se il sito ha una lingua sola.
+     *
+     * @return string[]
+     */
+    public static function languages(): array
+    {
+        $codes = [];
+        $def   = '';
+        $wpml  = apply_filters('wpml_active_languages', null, ['skip_missing' => 0]);
+        if (is_array($wpml) && $wpml) {
+            $codes = array_keys($wpml);
+            $def   = (string) apply_filters('wpml_default_language', null);
+        } elseif (function_exists('pll_languages_list')) {
+            $codes = (array) pll_languages_list(['fields' => 'slug']);
+            $def   = function_exists('pll_default_language') ? (string) pll_default_language('slug') : '';
+        }
+        $codes = array_values(array_unique(array_filter(array_map('strval', $codes))));
+        if (count($codes) < 2) {
+            return [];
+        }
+        if ($def !== '' && in_array($def, $codes, true)) {
+            $codes = array_merge([$def], array_values(array_diff($codes, [$def])));
+        }
+
+        return $codes;
     }
 
     public static function admin_bar(\WP_Admin_Bar $bar): void
@@ -273,7 +302,7 @@ class Plugin
         $ids = array_slice(array_unique(array_filter(array_map('sanitize_key', $ids))), 0, 10);
         $n     = (int) get_post_meta($note->ID, '_dcn_n', true);
         $path  = (string) get_post_meta($note->ID, '_dcn_path', true);
-        $link  = add_query_arg('dcn', 'n', trailingslashit(home_url($path))) . '#dcn-' . $note->ID;
+        $link  = self::page_url($path, $note->ID);
         $shot  = (string) get_post_meta($note->ID, '_dcn_shot', true);
         $image = $shot !== '' ? trailingslashit(wp_get_upload_dir()['basedir']) . $shot : '';
         $state = in_array($kind, ['resolved', 'progress'], true);
@@ -381,6 +410,19 @@ class Plugin
         $path = (string) wp_parse_url($path, PHP_URL_PATH);
 
         return trailingslashit($path === '' ? '/' : $path);
+    }
+
+    /**
+     * Indirizzo completo di una pagina dal percorso salvato con la nota (che è già quello del browser, lingua compresa:
+     * es. «/en/products/»). Non usa home_url(): con WPML a cartelle home_url() toglie la lingua del percorso e mette quella
+     * della richiesta in corso (di solito la predefinita), e il link porterebbe alla lingua sbagliata.
+     */
+    public static function page_url(string $path, int $note = 0): string
+    {
+        $home   = (array) wp_parse_url((string) get_option('home'));
+        $origin = ($home['scheme'] ?? (is_ssl() ? 'https' : 'http')) . '://' . ($home['host'] ?? '') . (isset($home['port']) ? ':' . $home['port'] : '');
+
+        return add_query_arg('dcn', 'n', $origin . self::normalize_path($path)) . ($note ? '#dcn-' . $note : '');
     }
 
     /** Una nota con le sue risposte, nel formato usato dall'interfaccia. */

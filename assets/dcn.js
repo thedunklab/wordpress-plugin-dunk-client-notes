@@ -9,6 +9,15 @@
     window.__dcn = true
 
     const normPath = (p) => (p.endsWith('/') ? p : p + '/')
+    // lingua di una nota (siti WPML/Polylang): cartella iniziale del percorso («/en/…»), poi ?lang= dell'indirizzo, altrimenti la predefinita
+    const LANGS = cfg.langs || []
+    const langOf = (n) => {
+        if (!LANGS.length) return ''
+        const seg = (n.path || '').split('/')[1] || ''
+        if (LANGS.includes(seg)) return seg
+        try { const q = new URL(n.url || '', location.href).searchParams.get('lang'); if (q && LANGS.includes(q)) return q } catch (e) { /* indirizzo non valido */ }
+        return LANGS[0]
+    }
     const path = normPath(location.pathname)
     const state = { notes: [], all: null, tab: 'page', view: 'list', ready: null, contacts: [], current: 0, resolved: false, picking: false, composer: null }
 
@@ -291,11 +300,14 @@
 
     const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z"/></svg>'
     const renderFab = () => {
-        // il numero è il totale delle note aperte in tutto il sito (nel tooltip anche quelle di questa pagina)
+        // numero pieno: note aperte di questa pagina; «+N»: quelle aperte nel resto del sito (con WPML ogni lingua è un'altra pagina)
         const open = (state.all || state.notes).filter((n) => n.status !== 'resolved').length
         const here = state.notes.filter((n) => n.status !== 'resolved').length
-        fab.title = `${open} not${open === 1 ? 'a aperta' : 'e aperte'} nel sito, ${here} in questa pagina`
-        fab.replaceChildren(...[document.createRange().createContextualFragment(ICON), 'Note', open ? h('span', { class: 'badge' }, open) : null].filter(Boolean))
+        const other = Math.max(0, open - here)
+        fab.title = `${here} not${here === 1 ? 'a aperta' : 'e aperte'} in questa pagina` + (other ? `, ${other} in altre pagine (scheda «Tutte»)` : '')
+        fab.replaceChildren(...[document.createRange().createContextualFragment(ICON), 'Note',
+            here ? h('span', { class: 'badge' }, here) : null,
+            other ? h('span', { class: 'badge more' }, '+' + other) : null].filter(Boolean))
     }
 
     const renderPins = () => {
@@ -562,6 +574,7 @@
                 h('span', { class: 'item-meta' },
                     h('span', {}, `${n.author} · ${n.date}`, n.replies.length ? ` · ${n.replies.length} rispost${n.replies.length === 1 ? 'a' : 'e'}` : ''),
                     chipFor(n),
+                    state.tab === 'all' && langOf(n) ? h('span', { class: 'lang', title: 'Lingua della pagina' }, langOf(n).toUpperCase()) : null,
                     state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
                     n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
                     n.status !== 'open' ? statusBadge(n.status) : null)

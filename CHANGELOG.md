@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.0 — 2026-11-25
+- **WPML (lingue a cartelle, es. «/en/»)**: i link delle email («Apri la nota», «Note pronte», avvisi alle persone segnalate) e il pulsante «Apri la pagina nel punto della nota» in bacheca portano alla pagina nella lingua in cui è stata scritta la nota. Prima passavano da `home_url()`, che con WPML sostituiva la lingua del percorso con quella predefinita e apriva la pagina nella lingua sbagliata.
+- **Contatore del pulsante «Note»**: il numero pieno sono le note aperte di questa pagina; quelle aperte nel resto del sito compaiono a parte come «+N» (si trovano nella scheda «Tutte»). Prima il numero era il totale del sito e su una pagina senza note l'elenco sembrava vuoto per errore, soprattutto con WPML, dove ogni lingua è una pagina diversa.
+- **Lingua delle note** (siti WPML o Polylang): nella scheda «Tutte» ogni nota ha l'etichetta della lingua (IT, EN…), ricavata dalla cartella del percorso o da `?lang=`.
+
 ## 1.11.1 — 2026-11-13
 - Se il server rifiuta una richiesta (401/403, di solito sessione WordPress scaduta) il pannello lo dice chiaramente invece di «Errore di rete»; nel cambio di stato il pulsante torna attivo per riprovare.
 

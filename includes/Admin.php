@@ -522,7 +522,7 @@ class Admin
             return;
         }
         $n    = Plugin::format($post);
-        $view = add_query_arg('dcn', 'n', home_url($n['path'])) . '#dcn-' . $n['id'];
+        $view = Plugin::page_url($n['path'], (int) $n['id']);
         ?>
         <div class="wrap dcn-wrap">
             <h1 class="wp-heading-inline">Nota #<?php echo (int) $n['n']; ?></h1>
