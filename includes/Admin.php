@@ -534,6 +534,7 @@ class Admin
                         <p style="margin-top:0"><?php echo self::badge($n['status']); ?> &nbsp; <strong><?php echo esc_html($n['author']); ?></strong><?php echo $n['pending'] ? ' <em>(da confermare)</em>' : ''; ?><?php echo self::group_badge($n['group'], $n['source']); // già escapato ?> · <?php echo esc_html($n['date']); ?><?php echo $n['edited'] ? ' · <em>modificata</em>' : ''; ?></p>
                         <p style="font-size:15px;white-space:pre-wrap"><?php echo esc_html($n['text']); ?></p>
                         <p><a class="button button-primary" href="<?php echo esc_url($view); ?>" target="_blank" rel="noopener">Apri la pagina nel punto della nota</a> <code><?php echo esc_html($n['path']); ?></code></p>
+                        <?php if ($n['tr'] !== '') : ?><p class="description">Chi ha scritto la nota vedeva la pagina <strong>tradotta automaticamente dal browser in <?php echo esc_html(strtoupper($n['tr'])); ?></strong>: testi e screenshot sono la traduzione, non la versione del sito in quella lingua.</p><?php endif; ?>
                         <?php if ($n['shot']) : ?><p><a href="<?php echo esc_url($n['shot']); ?>" target="_blank" rel="noopener"><img src="<?php echo esc_url($n['shot']); ?>" alt="Screenshot" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:8px"></a></p><?php endif; ?>
                     </div>
                     <h2>Conversazione</h2>

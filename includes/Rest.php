@@ -123,6 +123,7 @@ class Rest
             'px'       => self::unit($r->get_param('px')),
             'py'       => max(0, (float) $r->get_param('py')),
             'vw'       => (int) $r->get_param('vw'),
+            'tr'       => self::lang_code($r->get_param('tr')), // lingua della traduzione automatica del browser, '' se la pagina non era tradotta
             'ua'       => mb_substr(sanitize_text_field((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 200),
             'group'    => self::group_id($r),
             'contact'  => self::contact_id($r),
@@ -139,7 +140,7 @@ class Rest
         $link = Plugin::page_url($path, $id);
         Plugin::notify('Nuova nota #' . $n . ' su ' . $path, "$author ha scritto:\n\n$text\n\nApri la nota: $link\nGestisci: " . admin_url('admin.php?page=dcn-notes&note=' . $id), [
             'title'   => 'Nuova nota #' . $n,
-            'intro'   => "$author ha scritto una nota sulla pagina $path.",
+            'intro'   => "$author ha scritto una nota sulla pagina $path." . ($meta['tr'] !== '' ? "\nAttenzione: la vedeva tradotta automaticamente dal browser in " . strtoupper($meta['tr']) . '.' : ''),
             'items'   => [['n' => $n, 'author' => $author, 'text' => $text]],
             'buttons' => [['label' => 'Apri la nota', 'url' => $link, 'primary' => true], ['label' => 'Gestisci in bacheca', 'url' => admin_url('admin.php?page=dcn-notes&note=' . $id)]],
         ]);
@@ -552,5 +553,13 @@ class Rest
         $out = (string) ob_get_clean();
 
         return $out !== '' ? $out : $bin;
+    }
+
+    /** Codice lingua tipo «es» o «pt-br» (minuscolo, al massimo 10 caratteri); '' se non valido. */
+    private static function lang_code($v): string
+    {
+        $v = strtolower(trim((string) $v));
+
+        return preg_match('/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/', $v) ? $v : '';
     }
 }

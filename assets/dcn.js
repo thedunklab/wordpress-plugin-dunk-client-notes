@@ -11,6 +11,16 @@
     const normPath = (p) => (p.endsWith('/') ? p : p + '/')
     // lingua di una nota (siti WPML/Polylang): cartella iniziale del percorso («/en/…»), poi ?lang= dell'indirizzo, altrimenti la predefinita
     const LANGS = cfg.langs || []
+    // traduzione automatica del browser (Chrome: classe «translated-ltr|rtl» su <html> e lang cambiato nella lingua di arrivo):
+    // la nota la registra, così si capisce che la pagina vista non era quella della lingua del sito
+    const PAGE_LANG = (document.documentElement.lang || '').toLowerCase()
+    const browserTranslation = () => {
+        const html = document.documentElement
+        if (!/\btranslated-(ltr|rtl)\b/.test(html.className)) return ''
+        const to = (html.lang || '').toLowerCase()
+        return (to && to !== PAGE_LANG ? to : (navigator.language || 'und')).split('-')[0].slice(0, 10)
+    }
+    const trChip = (n) => n.tr ? h('span', { class: 'tr', title: `Chi ha scritto la nota vedeva questa pagina tradotta automaticamente dal browser in ${n.tr.toUpperCase()}: testi e screenshot sono la traduzione, non la versione del sito in quella lingua` }, `Tradotta dal browser in ${n.tr.toUpperCase()}`) : null
     const langOf = (n) => {
         if (!LANGS.length) return ''
         const seg = (n.path || '').split('/')[1] || ''
@@ -576,6 +586,7 @@
                     chipFor(n),
                     state.tab === 'all' && langOf(n) ? h('span', { class: 'lang', title: 'Lingua della pagina' }, langOf(n).toUpperCase()) : null,
                     state.tab === 'all' ? h('code', { class: 'path' }, n.path) : null,
+                    trChip(n),
                     n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
                     n.status !== 'open' ? statusBadge(n.status) : null)
             )
@@ -662,6 +673,7 @@
         const [noteText, noteEdit] = editable(n, n)
         body.append(h('div', { class: 'note-card' },
             h('div', { class: 'note-head' }, numBadge(n), whoLine(n, noteEdit), statusBadge(n.status)),
+            trChip(n),
             n.path === path && isLost(n) ? h('span', { class: 'lost', title: 'L’elemento della nota non è più in questa pagina: la puntina è solo approssimata' }, 'Elemento non trovato') : null,
             noteText,
             n.tagged?.length ? h('p', { class: 'tagged' }, 'Segnalata a: ' + n.tagged.join(', ')) : null,
@@ -810,7 +822,7 @@
                 const screenshot = shot.checked ? await pick.shot : ''
                 const note = await api('/notes', { method: 'POST', body: {
                     path, url: location.href.split('#')[0], selector: pick.selector, sel2: pick.sel2, anchor: pick.anchor, rx: pick.rx, ry: pick.ry, px: pick.px, py: pick.py,
-                    vw: innerWidth, text: text.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / pick.vh, tag: tags.value(), ...whoFields(),
+                    vw: innerWidth, tr: browserTranslation(), text: text.value, screenshot, shot_fx: pick.cx / innerWidth, shot_fy: pick.cy / pick.vh, tag: tags.value(), ...whoFields(),
                 } })
                 saveKey(note.id, note.key)
                 closeComposer()

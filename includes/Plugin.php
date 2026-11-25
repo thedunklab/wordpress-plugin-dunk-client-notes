@@ -468,6 +468,7 @@ class Plugin
             'px'       => (float) $meta('px'),
             'py'       => (float) $meta('py'),
             'vw'       => (int) $meta('vw'),
+            'tr'       => (string) $meta('tr'),
             'shot'     => $shot !== '' ? trailingslashit($up['baseurl']) . $shot : '',
             'date'     => self::human_date($note),
             'tagged'   => array_values(array_filter((array) $meta('tagged'))),

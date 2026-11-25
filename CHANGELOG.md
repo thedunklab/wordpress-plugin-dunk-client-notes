@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.12.1 — 2026-11-25
+- **Pagina tradotta dal browser**: se chi scrive la nota sta leggendo la pagina tradotta automaticamente da Chrome, la nota lo registra e lo mostra con l'etichetta «Tradotta dal browser in ES» nell'elenco, nella scheda della nota, in bacheca e nell'email della nuova nota. Così si capisce che testi e screenshot sono la traduzione del browser e non la versione del sito in quella lingua (es. la pagina italiana letta in spagnolo invece di quella in «/es/»). Le note già scritte non hanno questa informazione.
+
 ## 1.12.0 — 2026-11-25
 - **WPML (lingue a cartelle, es. «/en/»)**: i link delle email («Apri la nota», «Note pronte», avvisi alle persone segnalate) e il pulsante «Apri la pagina nel punto della nota» in bacheca portano alla pagina nella lingua in cui è stata scritta la nota. Prima passavano da `home_url()`, che con WPML sostituiva la lingua del percorso con quella predefinita e apriva la pagina nella lingua sbagliata.
 - **Contatore del pulsante «Note»**: il numero pieno sono le note aperte di questa pagina; quelle aperte nel resto del sito compaiono a parte come «+N» (si trovano nella scheda «Tutte»). Prima il numero era il totale del sito e su una pagina senza note l'elenco sembrava vuoto per errore, soprattutto con WPML, dove ogni lingua è una pagina diversa.
